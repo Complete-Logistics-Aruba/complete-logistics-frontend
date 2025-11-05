@@ -1,2 +1,2 @@
-# complete-logistics-frontend
-Frontend for Complete Logistics System – React + MUI + Vite + TypeScript
+# Complete Logistics System – Frontend Foundations
+React + Vite + MUI (Devias Kit Pro) setup for internal logistics platform.
