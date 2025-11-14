@@ -59,14 +59,11 @@ const createNavItems = () => {
 		}
 
 		if (warehouseItems.length > 0) {
-			// Make Warehouse a branch (expandable) when it has children
 			operationsItems.push({ key: "warehouse", title: "Warehouse", icon: "warehouse", items: warehouseItems });
 		} else {
-			// Otherwise keep Warehouse directly clickable
 			operationsItems.push({ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "warehouse" });
 		}
 	} else if (featureFlags.SHOW_BROKERAGE) {
-		// Fallback: show Brokerage at Operations level when Warehouse is hidden
 		operationsItems.push({ key: "brokerage", title: "Brokerage", href: paths.brokerage, icon: "handshake" });
 	}
 
