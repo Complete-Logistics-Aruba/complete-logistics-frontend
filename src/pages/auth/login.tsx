@@ -234,7 +234,7 @@ export function Page() {
 									label="Email address"
 									name="email"
 									type="email"
-									placeholder="sofia@devias.io"
+									placeholder="claudio@complete.aw"
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
 								/>

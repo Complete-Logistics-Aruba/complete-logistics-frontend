@@ -173,7 +173,7 @@ function NavItem({
 	const active = isNavItemActive({ disabled, external, href, matcher, pathname });
 	const Icon = icon ? icons[icon] : null;
 	const ExpandIcon = open ? CaretDownIcon : CaretRightIcon;
-	const isBranch = children && !href;
+	const isBranch = Boolean(children);
 	const showChildren = Boolean(children && open);
 
 	return (
@@ -190,6 +190,14 @@ function NavItem({
 								}
 							},
 							role: "button",
+							...(href && !children
+								? {
+										component: external ? "a" : RouterLink,
+										href,
+										target: external ? "_blank" : undefined,
+										rel: external ? "noreferrer" : undefined,
+									}
+								: {}),
 						}
 					: {
 							...(href

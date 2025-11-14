@@ -173,7 +173,27 @@ pnpm build
 
 The build output will be in the `dist` directory.
 
-### Environment Configuration
+### Required Environment Variables
+
+The following environment variables MUST be set for a successful deployment:
+
+```
+# Enable Mock Service Worker for API simulation (REQUIRED)
+VITE_ENABLE_MOCKING=true
+
+# Application configuration
+VITE_APP_NAME=Complete Logistics System
+
+# API Configuration - if using real backend, change accordingly
+VITE_API_URL=https://api.example.com
+
+# Environment identifier (local, staging, production)
+VITE_ENV_NAME=production
+```
+
+> **IMPORTANT:** Setting `VITE_ENABLE_MOCKING=true` is critical for the application to function correctly when no real backend is available. Without this variable, login functionality will fail.
+
+### Environment Configuration Files
 
 Depending on the target environment, use the appropriate .env file:
 
@@ -189,6 +209,9 @@ The application is configured for deployment on Render:
 2. Select the appropriate branch for deployment
 3. Configure the build command: `pnpm install && pnpm build`
 4. Set the publish directory: `dist`
+5. **Add Environment Variables:**
+   - Add all environment variables listed above in the Render dashboard
+   - Double-check that `VITE_ENABLE_MOCKING=true` is properly set
 
 ## Demo Accounts
 
