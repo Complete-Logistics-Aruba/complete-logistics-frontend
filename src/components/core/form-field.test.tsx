@@ -14,11 +14,11 @@ describe("FormField", () => {
 		// Assert
 		const helperTextElement = screen.getByText("This field is required");
 		expect(helperTextElement).toBeInTheDocument();
-		
+
 		// Find the input field by its role
 		const inputField = screen.getByRole("textbox", { name: /test field/i });
 		expect(inputField).toBeInTheDocument();
-		
+
 		// Verify error state
 		expect(helperTextElement.className).toContain("Mui-error");
 	});
@@ -31,12 +31,12 @@ describe("FormField", () => {
 		const inputField = screen.getByRole("textbox", { name: /test field/i });
 		expect(inputField).toBeInTheDocument();
 		expect(screen.queryByText("This field is required")).not.toBeInTheDocument();
-		
+
 		// Verify the form control doesn't have the error class
-		const formControl = inputField.closest('div')?.parentElement;
+		const formControl = inputField.closest("div")?.parentElement;
 		expect(formControl?.className).not.toContain("Mui-error");
 	});
-	
+
 	it("renders with different helper text when not in error state", () => {
 		// Arrange
 		render(<FormField label="Test Field" helperText="Helper information" />);
@@ -45,7 +45,7 @@ describe("FormField", () => {
 		const helperText = screen.getByText("Helper information");
 		expect(helperText).toBeInTheDocument();
 		expect(helperText.className).not.toContain("Mui-error");
-		
+
 		// Verify input exists
 		const inputField = screen.getByRole("textbox", { name: /test field/i });
 		expect(inputField).toBeInTheDocument();
@@ -58,26 +58,19 @@ describe("FormField", () => {
 		// Assert
 		// Find the input element directly
 		const inputElement = screen.getByPlaceholderText("Enter value");
-		expect(inputElement).toHaveAttribute('placeholder', 'Enter value');
+		expect(inputElement).toHaveAttribute("placeholder", "Enter value");
 		expect(inputElement).toBeRequired();
 	});
-	
+
 	it("shows a more complex validation error message", () => {
 		// Arrange
-		render(
-			<FormField 
-				label="Email" 
-				error={true} 
-				helperText="Please enter a valid email address"
-				required
-			/>
-		);
+		render(<FormField label="Email" error={true} helperText="Please enter a valid email address" required />);
 
 		// Assert
 		const helperTextElement = screen.getByText("Please enter a valid email address");
 		expect(helperTextElement).toBeInTheDocument();
 		expect(helperTextElement.className).toContain("Mui-error");
-		
+
 		// Verify input is required
 		const inputField = screen.getByRole("textbox", { name: /email/i });
 		expect(inputField).toBeRequired();

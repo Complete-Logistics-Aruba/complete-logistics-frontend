@@ -1,7 +1,7 @@
 {
-	"name": "@devias-kit-pro/vite-starter",
-	"author": "Devias IO",
-	"version": "8.1.0",
+	"name": "complete-logistics-system",
+	"author": "CLogistics",
+	"version": "1.0.0",
 	"private": true,
 	"scripts": {
 		"dev": "vite",
