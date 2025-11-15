@@ -15,94 +15,59 @@ export interface DashboardConfig {
 	navItems: NavItemConfig[];
 }
 
-// Helper function to create nav items conditionally based on feature flags
+// Helper function to create nav items as a flat list (no groups) per approved structure
 const createNavItems = () => {
-	const items: NavItemConfig[] = [{ key: "dashboard", title: "Dashboard", href: "/", icon: "house" }];
+	const items: NavItemConfig[] = [];
 
-	// Shipping menu group with sub-items
-	const shippingItems: NavItemConfig[] = [];
+	// 1. Dashboard
+	items.push({ key: "dashboard", title: "Dashboard", href: "/", icon: "house" });
 
+	// 2. Consolidation
 	if (featureFlags.SHOW_CONSOLIDATION) {
-		shippingItems.push({ key: "consolidation", title: "Consolidation", href: paths.consolidation, icon: "package" });
+		items.push({ key: "consolidation", title: "Consolidation", href: paths.consolidation, icon: "cube" });
 	}
 
+	// 3. Full container (FCL)
 	if (featureFlags.SHOW_FCL) {
-		shippingItems.push({ key: "fcl", title: "FCL", href: paths.fcl, icon: "package" });
+		items.push({ key: "fcl", title: "Full container (FCL)", href: paths.fcl, icon: "cube" });
 	}
 
+	// 4. LCL
 	if (featureFlags.SHOW_LCL) {
-		shippingItems.push({ key: "lcl", title: "LCL", href: paths.lcl, icon: "package" });
+		items.push({ key: "lcl", title: "LCL", href: paths.lcl, icon: "cube" });
 	}
 
+	// 5. Air
 	if (featureFlags.SHOW_AIR) {
-		shippingItems.push({ key: "air", title: "Air", href: paths.air, icon: "plane" });
+		items.push({ key: "air", title: "Air", href: paths.air, icon: "upload" });
 	}
 
-	// Only add the shipping group if it has items
-	if (shippingItems.length > 0) {
-		items.push({
-			key: "shipping",
-			title: "Shipping",
-			icon: "truck",
-			items: shippingItems,
-		});
-	}
-
-	// Operations menu group with sub-items
-	const operationsItems: NavItemConfig[] = [];
-
-	// If Warehouse is enabled, it should be the parent. Brokage nests under it when enabled.
-	if (featureFlags.SHOW_WAREHOUSE) {
-		const warehouseItems: NavItemConfig[] = [];
-		if (featureFlags.SHOW_BROKERAGE) {
-			warehouseItems.push({ key: "brokerage", title: "Brokerage", href: paths.brokerage, icon: "handshake" });
-		}
-
-		if (warehouseItems.length > 0) {
-			operationsItems.push({ key: "warehouse", title: "Warehouse", icon: "warehouse", items: warehouseItems });
-		} else {
-			operationsItems.push({ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "warehouse" });
-		}
-	} else if (featureFlags.SHOW_BROKERAGE) {
-		operationsItems.push({ key: "brokerage", title: "Brokerage", href: paths.brokerage, icon: "handshake" });
-	}
-
-	// Only add the operations group if it has items
-	if (operationsItems.length > 0) {
-		items.push({
-			key: "operations",
-			title: "Operations",
-			icon: "gear",
-			items: operationsItems,
-		});
-	}
-
-	// Business menu group with sub-items
-	const businessItems: NavItemConfig[] = [];
-
+	// 6. Invoicing
 	if (featureFlags.SHOW_INVOICING) {
-		businessItems.push({ key: "invoicing", title: "Invoicing", href: paths.invoicing, icon: "currency-dollar" });
+		items.push({ key: "invoicing", title: "Invoicing", href: paths.invoicing, icon: "receipt" });
 	}
 
+	// 7. Warehouse
+	if (featureFlags.SHOW_WAREHOUSE) {
+		items.push({ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "kanban" });
+	}
+
+	// 8. Brokerage
+	if (featureFlags.SHOW_BROKERAGE) {
+		items.push({ key: "brokerage", title: "Brokerage", href: paths.brokerage, icon: "briefcase" });
+	}
+
+	// 9. Documents
 	if (featureFlags.SHOW_DOCUMENTS) {
-		businessItems.push({ key: "documents", title: "Documents", href: paths.documents, icon: "file-text" });
+		items.push({ key: "documents", title: "Documents", href: paths.documents, icon: "file" });
 	}
 
+	// 10. Data Management
 	if (featureFlags.SHOW_DATA) {
-		businessItems.push({ key: "data", title: "Data Management", href: paths.data, icon: "database" });
+		items.push({ key: "data", title: "Data Management", href: paths.data, icon: "chart-pie" });
 	}
 
-	// Only add the business group if it has items
-	if (businessItems.length > 0) {
-		items.push({
-			key: "business",
-			title: "Business",
-			icon: "briefcase",
-			items: businessItems,
-		});
-	}
-
-	// Add Admin as a standalone item for special permissions
+	// 11. Admin
 	if (featureFlags.SHOW_ADMIN) {
 		items.push({ key: "admin", title: "Admin", href: paths.admin, icon: "sliders-horizontal" });
 	}
@@ -116,22 +81,7 @@ export const dashboardConfig = {
 	navItems: [
 		{
 			key: "main",
-
 			items: createNavItems(),
-		},
-		{
-			key: "testing",
-			title: "Testing",
-			items: [
-				{
-					key: "api-test",
-					title: "API Testing",
-					icon: "brackets-curly",
-					items: [
-						{ key: "api-test-page", title: "API Test Page", href: paths.dashboard.apiTest, icon: "brackets-curly" },
-					],
-				},
-			],
 		},
 	],
 } satisfies DashboardConfig;

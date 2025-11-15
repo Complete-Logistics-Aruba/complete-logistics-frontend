@@ -1,39 +1,75 @@
 import React from "react";
-import { Breadcrumbs, Container, Link, Typography } from "@mui/material";
-import { useLocation } from "react-router-dom";
+import { Box, Breadcrumbs, Container, Link, Typography } from "@mui/material";
+import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import { dashboardConfig } from "@/config/dashboard";
 
 interface MainLayoutProps {
 	children: React.ReactNode;
 }
 
+// Helper function to find route title from config
+const getRouteTitleFromConfig = (pathname: string): string | null => {
+	const items = dashboardConfig.navItems[0]?.items || [];
+	const item = items.find((navItem) => navItem.href === pathname);
+	return item?.title || null;
+};
+
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 	const location = useLocation();
+	const navigate = useNavigate();
+	const isHome = location.pathname === "/";
 
-	// Generate breadcrumbs from path
-	const pathSegments = location.pathname.split("/").filter(Boolean);
+	// Get route title from config
+	const routeTitle = getRouteTitleFromConfig(location.pathname);
+
+	// Only show breadcrumbs if not on home page
+	if (isHome) {
+		return (
+			<Container maxWidth="lg" sx={{ py: 4 }}>
+				{children}
+			</Container>
+		);
+	}
 
 	return (
 		<Container maxWidth="lg" sx={{ py: 4 }}>
-			{/* Breadcrumbs */}
-			<Breadcrumbs aria-label="breadcrumb" sx={{ mb: 3 }}>
-				<Link color="inherit" href="/">
-					Home
-				</Link>
-				{pathSegments.map((segment, index) => {
-					const path = `/${pathSegments.slice(0, index + 1).join("/")}`;
-					const isLast = index === pathSegments.length - 1;
+			{/* Breadcrumbs with back button */}
+			<Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+				<button
+					onClick={() => navigate(-1)}
+					style={{
+						background: "none",
+						border: "none",
+						cursor: "pointer",
+						padding: 0,
+						display: "flex",
+						alignItems: "center",
+					}}
+					aria-label="Go back"
+				>
+					<ArrowLeftIcon size={20} weight="bold" />
+				</button>
 
-					return isLast ? (
-						<Typography color="text.primary" key={path}>
-							{segment.charAt(0).toUpperCase() + segment.slice(1)}
-						</Typography>
-					) : (
-						<Link color="inherit" href={path} key={path}>
-							{segment.charAt(0).toUpperCase() + segment.slice(1)}
+				{routeTitle ? (
+					<Typography variant="h6" sx={{ fontWeight: 600 }}>
+						{routeTitle}
+					</Typography>
+				) : (
+					<Breadcrumbs aria-label="breadcrumb">
+						<Link color="inherit" href="/">
+							Home
 						</Link>
-					);
-				})}
-			</Breadcrumbs>
+						<Typography color="text.primary">
+							{(() => {
+								const segment = location.pathname.split("/").find(Boolean);
+								return segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : "";
+							})()}
+						</Typography>
+					</Breadcrumbs>
+				)}
+			</Box>
 
 			{children}
 		</Container>

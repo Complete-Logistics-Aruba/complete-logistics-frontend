@@ -3,9 +3,9 @@ export default {
 	// Format all files with Prettier
 	"**/*.{js,jsx,ts,tsx,json,md,mdx,css,html,yml,yaml,scss}": ["prettier --write"],
 
-	// Skip ESLint for now to make pre-commit hooks pass
-	"**/*.{js,jsx,ts,tsx}": [],
+	// Lint and fix TypeScript/JavaScript files
+	"**/*.{js,jsx,ts,tsx}": ["eslint --fix"],
 
-	// Only do type checking on TS files
+	// Type check TypeScript files
 	"**/*.{ts,tsx}": () => "tsc --noEmit",
 };

@@ -6,6 +6,7 @@ interface ImportMetaEnv {
 	VITE_VERCEL_URL?: string;
 	VITE_LOG_LEVEL?: string;
 	VITE_AUTH_STRATEGY?: string;
+	VITE_ENABLE_MOCKING?: string;
 
 	// Auth0
 	VITE_AUTH0_DOMAIN?: string;

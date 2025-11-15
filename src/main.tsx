@@ -6,8 +6,10 @@ import { routes } from "@/routes";
 import { Root } from "@/root";
 import { ScrollRestoration } from "@/components/core/scroll-restoration";
 
-// Initialize MSW only in development environment
-if (import.meta.env.DEV) {
+// Initialize MSW in development or when explicitly enabled via VITE_ENABLE_MOCKING
+const shouldEnableMocking = import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKING === "true";
+
+if (shouldEnableMocking) {
 	const initMocks = async () => {
 		try {
 			const { worker } = await import("@/mocks/browser");
