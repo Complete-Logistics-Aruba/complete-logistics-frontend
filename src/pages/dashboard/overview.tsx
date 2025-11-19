@@ -12,7 +12,7 @@ import type { Metadata } from "@/types/metadata";
 import { appConfig } from "@/config/app";
 import { Summary } from "@/components/dashboard/overview/summary";
 
-const metadata = { title: `Overview | Dashboard | ${appConfig.name}` } satisfies Metadata;
+const metadata = { title: appConfig.name } satisfies Metadata;
 
 // Helper function to get user-specific FCL key
 const getUserFclKey = (): string => {
