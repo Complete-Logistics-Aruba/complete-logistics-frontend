@@ -60,7 +60,6 @@
 		"i18next": "25.2.1",
 		"lucide-react": "^0.553.0",
 		"mapbox-gl": "3.12.0",
-		"msw": "^2.12.1",
 		"notistack": "^3.0.2",
 		"oidc-client-ts": "3.2.1",
 		"openid-client": "6.5.1",
@@ -125,10 +124,5 @@
 			"react": "^16.8.0 || 17.x || 18.x || 19.x",
 			"react-dom": "^16.8.0 || 17.x || 18.x || 19.x"
 		}
-	},
-	"msw": {
-		"workerDirectory": [
-			"public"
-		]
 	}
 }

@@ -12,7 +12,6 @@ import {
 	TableRow,
 	Typography,
 } from "@mui/material";
-import axios from "axios";
 import { Plus } from "lucide-react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
@@ -58,9 +57,12 @@ export function Page() {
 		try {
 			setLoading(true);
 			setError(null);
-			const response = await axios.get(`${import.meta.env.VITE_API_URL}/fcl`);
-			console.log("Fetched shipments:", response.data);
-			setShipments(response.data.results || []);
+			// TODO: Replace with real API call when backend is ready
+			// const response = await axios.get(`${import.meta.env.VITE_API_URL}/fcl`);
+			// setShipments(response.data.results || []);
+
+			// For now, show empty state
+			setShipments([]);
 		} catch (error_) {
 			console.error("Error fetching FCL shipments:", error_);
 			setError(error_ as Error);

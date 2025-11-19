@@ -6,29 +6,9 @@ import { routes } from "@/routes";
 import { Root } from "@/root";
 import { ScrollRestoration } from "@/components/core/scroll-restoration";
 
-// Initialize MSW in development or when explicitly enabled via VITE_ENABLE_MOCKING
-const shouldEnableMocking = import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKING === "true";
-
-if (shouldEnableMocking) {
-	const initMocks = async () => {
-		try {
-			const { worker } = await import("@/mocks/browser");
-			await worker.start({
-				// Show all requests in browser console
-				onUnhandledRequest: "warn", // Changed to warn to see unhandled requests
-				serviceWorker: {
-					url: "/mockServiceWorker.js",
-				},
-			});
-			console.log("[MSW] Mock Service Worker started successfully");
-		} catch (error) {
-			console.error("[MSW] Failed to start Mock Service Worker:", error);
-		}
-	};
-
-	// Wait for MSW to initialize before rendering
-	initMocks();
-}
+// Stage 2: Using real Supabase auth and API
+// Mock Service Worker (MSW) is completely disabled
+// All data comes from real Supabase backend
 
 const root = createRoot(document.querySelector("#root")!);
 

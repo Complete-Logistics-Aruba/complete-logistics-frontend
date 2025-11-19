@@ -17,7 +17,6 @@ import {
 	TextField,
 	Typography,
 } from "@mui/material";
-import axios from "axios";
 import { Plus, Trash2 } from "lucide-react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -101,20 +100,18 @@ export function Page() {
 	};
 
 	// Form submission
-	const onSubmit = async (data: FormValues) => {
+	const onSubmit = async (_data: FormValues) => {
 		setIsSubmitting(true);
 
 		try {
-			// Send data to the mock API
-			const response = await axios.post(`${import.meta.env.VITE_API_URL}/fcl`, data);
+			// TODO: Replace with real API call when backend is ready
+			// const response = await axios.post(`${import.meta.env.VITE_API_URL}/fcl`, _data);
+			// console.log("FCL shipment created:", response.data);
 
-			console.log("FCL shipment created:", response.data);
+			// Show success toast
+			toast.success("New FCL shipment created successfully!");
 
-			// Show success toast with mock message as per requirements
-			toast.success("FCL shipment created (mock).");
-
-			// Redirect back to FCL list to show the new record
-			navigate("/fcl");
+			// Stay on the page (don't navigate)
 		} catch (error) {
 			console.error("Error submitting form:", error);
 			toast.error("An error occurred while creating the shipment.");

@@ -51,28 +51,10 @@ export function Page() {
 		try {
 			console.log("Submitting login form:", { email, password: "****" });
 
-			// These are the valid test emails from the mock data
-			const validTestEmails = [
-				"claudio@complete.aw",
-				"emelyn@complete.aw",
-				"thais@complete.aw",
-				"migna@complete.aw",
-				"warehouse@complete.aw",
-				"genilee@complete.aw",
-			];
-
-			if (!validTestEmails.includes(email)) {
-				console.warn("Using a non-mocked email. Valid test emails are:", validTestEmails);
-			}
-
 			await login(email, password);
 
-			// Get user name from email (before @ symbol)
-			const name = email.split("@")[0];
-			const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-
 			// Use standardized message template
-			toast.success(`Welcome back, ${capitalizedName}.`);
+			toast.success(`Welcome back.`);
 			// Always redirect to dashboard after login
 			navigate(dashboardPath, { replace: true });
 		} catch (error_) {

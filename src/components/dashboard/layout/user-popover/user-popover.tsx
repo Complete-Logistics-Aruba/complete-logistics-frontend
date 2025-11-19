@@ -61,9 +61,9 @@ export function UserPopover({ anchorEl, onClose, open }: UserPopoverProps): Reac
 				<Typography color="text.secondary" variant="body2">
 					{user?.email || ""}
 				</Typography>
-				{user?.roles && user.roles.length > 0 && (
+				{user?.role && (
 					<Typography color="primary" variant="body2" sx={{ mt: 0.5, fontWeight: 500 }}>
-						Role: {user.roles.join(", ")}
+						Role: {user.role}
 					</Typography>
 				)}
 			</Box>

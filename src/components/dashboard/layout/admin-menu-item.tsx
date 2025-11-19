@@ -10,7 +10,7 @@ interface AdminMenuItemProps {
 
 export function AdminMenuItem({ onItemsReady }: AdminMenuItemProps) {
 	const { user } = useAuth();
-	const isAdmin = user?.roles?.includes("Admin");
+	const isAdmin = user?.role === "Admin";
 
 	React.useEffect(() => {
 		let items: NavItemConfig[] = [];

@@ -1,10 +1,10 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { authService, User } from "./auth-service";
+import { authClient, AuthUser } from "@/lib/api/auth-client";
 
 interface AuthContextType {
-	user: User | null;
+	user: AuthUser | null;
 	isAuthenticated: boolean;
 	isLoading: boolean;
 	login: (email: string, password: string) => Promise<void>;
@@ -18,28 +18,49 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-	const [user, setUser] = useState<User | null>(null);
+	const [user, setUser] = useState<AuthUser | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const navigate = useNavigate();
 
-	// Check if user is already logged in
+	// Set up auth state listener and check initial auth status
 	useEffect(() => {
-		const checkAuth = async () => {
-			if (authService.isAuthenticated()) {
-				const userData = authService.getUser();
-				setUser(userData);
+		let unsubscribe: (() => void) | null = null;
+
+		const setupAuth = async () => {
+			try {
+				// Check if user is already logged in
+				const currentUser = await authClient.getCurrentUser();
+				setUser(currentUser);
+
+				// Listen for auth state changes
+				unsubscribe = authClient.onAuthStateChange((authUser) => {
+					setUser(authUser);
+					// Ensure loading is false when auth state changes
+					setIsLoading(false);
+				});
+			} catch (error) {
+				console.error("Error setting up auth:", error);
+				setUser(null);
+			} finally {
+				setIsLoading(false);
 			}
-			setIsLoading(false);
 		};
 
-		checkAuth();
+		setupAuth();
+
+		// Cleanup subscription on unmount
+		return () => {
+			if (unsubscribe) {
+				unsubscribe();
+			}
+		};
 	}, []);
 
 	const login = async (email: string, password: string) => {
 		setIsLoading(true);
 		try {
-			const response = await authService.login({ email, password });
-			setUser(response.user);
+			const authUser = await authClient.login(email, password);
+			setUser(authUser);
 		} finally {
 			setIsLoading(false);
 		}
@@ -48,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 	const logout = async () => {
 		setIsLoading(true);
 		try {
-			await authService.logout();
+			await authClient.logout();
 			setUser(null);
 			// Redirect to login page after logout
 			navigate("/auth/login", { replace: true });

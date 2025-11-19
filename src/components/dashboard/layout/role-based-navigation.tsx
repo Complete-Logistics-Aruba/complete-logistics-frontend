@@ -10,7 +10,7 @@ interface RoleBasedNavigationProps {
 
 export function RoleBasedNavigation({ children, navItems }: RoleBasedNavigationProps) {
 	const { user } = useAuth();
-	const isAdmin = user?.roles?.includes("Admin");
+	const isAdmin = user?.role === "Admin";
 
 	// Filter navigation items based on user role
 	const filteredNavItems = useMemo(() => {
