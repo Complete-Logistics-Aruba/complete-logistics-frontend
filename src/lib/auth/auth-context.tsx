@@ -7,7 +7,7 @@ interface AuthContextType {
 	user: AuthUser | null;
 	isAuthenticated: boolean;
 	isLoading: boolean;
-	login: (email: string, password: string) => Promise<void>;
+	login: (email: string, password: string) => Promise<AuthUser>;
 	logout: () => Promise<void>;
 }
 
@@ -61,6 +61,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 		try {
 			const authUser = await authClient.login(email, password);
 			setUser(authUser);
+			return authUser;
 		} finally {
 			setIsLoading(false);
 		}
@@ -70,7 +71,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 		setIsLoading(true);
 		try {
 			await authClient.logout();
-			setUser(null);
+			// Don't manually set user to null - let the auth state change listener handle it
+			// This prevents race conditions
+			// Wait a bit for the auth state change listener to fire
+			await new Promise((resolve) => setTimeout(resolve, 100));
 			// Redirect to login page after logout
 			navigate("/auth/login", { replace: true });
 		} finally {

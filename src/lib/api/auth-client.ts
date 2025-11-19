@@ -8,7 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	throw new Error("Missing Supabase environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		autoRefreshToken: true,
+		persistSession: true,
+	},
+});
 
 /**
  * User profile type - extends Supabase auth user with profile data
@@ -54,9 +59,6 @@ export const authClient = {
 				throw new Error("Failed to fetch user profile");
 			}
 
-			// Store user in localStorage for persistence
-			localStorage.setItem("auth_user", JSON.stringify(user));
-
 			return user;
 		} catch (error) {
 			console.error("Login failed:", error);
@@ -74,9 +76,6 @@ export const authClient = {
 				console.error("Supabase logout error:", error.message);
 				throw new Error(error.message);
 			}
-
-			// Clear user from localStorage
-			localStorage.removeItem("auth_user");
 		} catch (error) {
 			console.error("Logout failed:", error);
 			throw error;

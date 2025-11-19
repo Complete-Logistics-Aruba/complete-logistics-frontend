@@ -51,10 +51,11 @@ export function Page() {
 		try {
 			console.log("Submitting login form:", { email, password: "****" });
 
-			await login(email, password);
+			const user = await login(email, password);
+			console.log("Login successful, user:", user);
 
-			// Use standardized message template
-			toast.success(`Welcome back.`);
+			// Show welcome message
+			toast.success("Welcome back!");
 			// Always redirect to dashboard after login
 			navigate(dashboardPath, { replace: true });
 		} catch (error_) {

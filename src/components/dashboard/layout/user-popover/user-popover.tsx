@@ -44,9 +44,6 @@ export interface UserPopoverProps {
 export function UserPopover({ anchorEl, onClose, open }: UserPopoverProps): React.JSX.Element {
 	const { user } = useAuth();
 
-	// Extract name from email if no name is available
-	const displayName = user?.name || (user?.email ? user.email.split("@")[0] : "User");
-
 	return (
 		<Popover
 			anchorEl={anchorEl}
@@ -57,7 +54,6 @@ export function UserPopover({ anchorEl, onClose, open }: UserPopoverProps): Reac
 			transformOrigin={{ horizontal: "right", vertical: "top" }}
 		>
 			<Box sx={{ p: 2 }}>
-				<Typography>{displayName}</Typography>
 				<Typography color="text.secondary" variant="body2">
 					{user?.email || ""}
 				</Typography>
