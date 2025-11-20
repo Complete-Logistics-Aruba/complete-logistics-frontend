@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
 	Box,
 	Button,
-	Divider,
 	FormControl,
 	IconButton,
 	InputAdornment,
@@ -166,49 +165,6 @@ export function Page() {
 						<Typography variant="h4" align="left" sx={{ mb: 1 }}>
 							Sign in
 						</Typography>
-						<Typography color="text.secondary" align="left" sx={{ mb: 3 }}>
-							Don&apos;t have an account? <Link href="/auth/register">Sign up</Link>
-						</Typography>
-
-						<Box sx={{ width: "100%", mb: 3 }}>
-							<Button
-								fullWidth
-								startIcon={<Box component="img" src="/assets/logo-google.svg" sx={{ height: 16 }} />}
-								size="large"
-								sx={{
-									backgroundColor: "white",
-									border: "1px solid",
-									borderColor: "divider",
-									color: "text.primary",
-									mb: 2,
-									"&:hover": {
-										backgroundColor: "rgba(145, 158, 171, 0.08)",
-									},
-								}}
-								variant="outlined"
-							>
-								Continue with Google
-							</Button>
-							<Button
-								fullWidth
-								startIcon={<Box component="img" src="/assets/logo-discord.svg" sx={{ height: 16 }} />}
-								size="large"
-								sx={{
-									backgroundColor: "white",
-									border: "1px solid",
-									borderColor: "divider",
-									color: "text.primary",
-									"&:hover": {
-										backgroundColor: "rgba(145, 158, 171, 0.08)",
-									},
-								}}
-								variant="outlined"
-							>
-								Continue with Discord
-							</Button>
-						</Box>
-
-						<Divider sx={{ my: 3, textAlign: "left" }}>or</Divider>
 
 						<form onSubmit={handleLogin}>
 							<Stack spacing={3}>
@@ -217,7 +173,7 @@ export function Page() {
 									label="Email address"
 									name="email"
 									type="email"
-									placeholder="claudio@complete.aw"
+									placeholder=""
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
 								/>
