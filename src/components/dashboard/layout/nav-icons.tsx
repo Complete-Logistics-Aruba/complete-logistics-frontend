@@ -3,6 +3,7 @@ import { AddressBookIcon } from "@phosphor-icons/react/dist/ssr/AddressBook";
 import { AlignLeftIcon } from "@phosphor-icons/react/dist/ssr/AlignLeft";
 import { BracketsCurlyIcon } from "@phosphor-icons/react/dist/ssr/BracketsCurly";
 import { BriefcaseIcon } from "@phosphor-icons/react/dist/ssr/Briefcase";
+import { CameraIcon } from "@phosphor-icons/react/dist/ssr/Camera";
 import { CalendarCheckIcon } from "@phosphor-icons/react/dist/ssr/CalendarCheck";
 import { ChartPieIcon } from "@phosphor-icons/react/dist/ssr/ChartPie";
 import { ChatsCircleIcon } from "@phosphor-icons/react/dist/ssr/ChatsCircle";
@@ -55,6 +56,7 @@ export const icons = {
 	"text-align-left": TextAlignLeftIcon,
 	"warning-diamond": WarningDiamondIcon,
 	briefcase: BriefcaseIcon,
+	camera: CameraIcon,
 	cube: CubeIcon,
 	file: FileIcon,
 	gear: GearIcon,

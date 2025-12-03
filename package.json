@@ -15,8 +15,10 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:ui": "vitest --ui",
+		"test:integration": "vitest run src/__tests__/workflows",
 		"prepare": "husky install",
-		"lint-staged": "lint-staged"
+		"lint-staged": "lint-staged",
+		"seed": "tsx scripts/seed-warehouse.ts"
 	},
 	"dependencies": {
 		"@auth0/auth0-react": "2.3.0",
@@ -47,6 +49,7 @@
 		"@phosphor-icons/react": "2.1.10",
 		"@react-pdf/renderer": "4.3.0",
 		"@supabase/supabase-js": "2.50.0",
+		"@tanstack/react-query": "^5.90.11",
 		"@testing-library/dom": "10.4.0",
 		"@tiptap/extension-link": "2.14.0",
 		"@tiptap/extension-placeholder": "2.14.0",
@@ -111,6 +114,7 @@
 		"jest-environment-jsdom": "30.0.0",
 		"lint-staged": "^16.2.6",
 		"prettier": "3.5.3",
+		"tsx": "^4.20.6",
 		"typescript": "5.8.3",
 		"typescript-eslint": "8.34.0",
 		"vitest": "^4.0.8"

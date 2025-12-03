@@ -28,9 +28,6 @@ export function Page() {
 	const [showPassword, setShowPassword] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	// Always redirect to dashboard after login
-	const dashboardPath = "/dashboard";
-
 	const handleLogin = async (event: React.FormEvent) => {
 		event.preventDefault();
 		setError("");
@@ -50,17 +47,28 @@ export function Page() {
 		try {
 			console.log("Submitting login form:", { email, password: "****" });
 
+			// Use auth context for authentication
 			const user = await login(email, password);
 			console.log("Login successful, user:", user);
 
+			// Check if user has a role
+			if (!user.role) {
+				setError("User role not found. Please contact your administrator.");
+				toast.error("User role not found. Please contact your administrator.");
+				setIsSubmitting(false);
+				return;
+			}
+
 			// Show welcome message
 			toast.success("Welcome back!");
-			// Always redirect to dashboard after login
-			navigate(dashboardPath, { replace: true });
+
+			// Route to dashboard (role-based display handled by Dashboard component)
+			navigate("/dashboard", { replace: true });
 		} catch (error_) {
 			console.error("Login error:", error_);
-			setError("Sign in failed. Check your email and password.");
-			toast.error("Sign in failed. Check your email and password.");
+			const errorMessage = error_ instanceof Error ? error_.message : "Sign in failed. Check your email and password.";
+			setError(errorMessage);
+			toast.error(errorMessage);
 		} finally {
 			setIsSubmitting(false);
 		}

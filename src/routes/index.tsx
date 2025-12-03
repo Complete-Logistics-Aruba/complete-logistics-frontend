@@ -17,6 +17,13 @@ const protectedDashboardRoute = {
 export const routes: RouteObject[] = [
 	{ index: true, element: <Navigate to="/dashboard" /> },
 	{
+		path: "health",
+		lazy: async () => {
+			const { Health } = await import("@/pages/health");
+			return { Component: Health };
+		},
+	},
+	{
 		path: "auth",
 		children: [
 			{
@@ -29,38 +36,11 @@ export const routes: RouteObject[] = [
 		],
 	},
 	{
-		path: "api-test",
+		path: "warehouse",
 		element: (
 			<RequireAuth>
 				<DashboardWrapper>
-					{React.createElement(
-						React.lazy(() => import("@/pages/api-test").then((module) => ({ default: module.Page })))
-					)}
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	// Main navigation routes as per ROUTING_STRUCTURE.md
-	{
-		path: "consolidation",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_CONSOLIDATION">
-						{React.createElement(
-							React.lazy(() => import("@/pages/consolidation").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "fcl",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_FCL">
+					<FeatureFlagGuard feature="SHOW_WAREHOUSE">
 						<Outlet />
 					</FeatureFlagGuard>
 				</DashboardWrapper>
@@ -70,122 +50,82 @@ export const routes: RouteObject[] = [
 			{
 				index: true,
 				element: React.createElement(
-					React.lazy(() => import("@/pages/fcl").then((module) => ({ default: module.Page })))
+					React.lazy(() => import("@/pages/warehouse").then((module) => ({ default: module.Page })))
 				),
 			},
 			{
-				path: "new",
+				path: "screen-0",
 				element: React.createElement(
-					React.lazy(() => import("@/pages/fcl/new").then((module) => ({ default: module.Page })))
+					React.lazy(() => import("@/components/screens/Screen0").then((module) => ({ default: module.Screen0 })))
+				),
+			},
+			{
+				path: "screen-0b",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen0B").then((module) => ({ default: module.Screen0B })))
+				),
+			},
+			{
+				path: "screen-1",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen1").then((module) => ({ default: module.Screen1 })))
+				),
+			},
+			{
+				path: "screen-2",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen2").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-3",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen3").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-5",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen5").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-6",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen6").then((module) => ({ default: module.Screen6 })))
+				),
+			},
+			{
+				path: "screen-7",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen7").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-4",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen4").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-8",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen8").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-9",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen9").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "screen-10",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen10").then((module) => ({ default: module.default })))
 				),
 			},
 		],
-	},
-	{
-		path: "lcl",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_LCL">
-						{React.createElement(React.lazy(() => import("@/pages/lcl").then((module) => ({ default: module.Page }))))}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "air",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_AIR">
-						{React.createElement(React.lazy(() => import("@/pages/air").then((module) => ({ default: module.Page }))))}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "invoicing",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_INVOICING">
-						{React.createElement(
-							React.lazy(() => import("@/pages/invoicing").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "warehouse",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_WAREHOUSE">
-						{React.createElement(
-							React.lazy(() => import("@/pages/warehouse").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "brokerage",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_BROKERAGE">
-						{React.createElement(
-							React.lazy(() => import("@/pages/brokerage").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "documents",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_DOCUMENTS">
-						{React.createElement(
-							React.lazy(() => import("@/pages/documents").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "data",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_DATA">
-						{React.createElement(React.lazy(() => import("@/pages/data").then((module) => ({ default: module.Page }))))}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
-	},
-	{
-		path: "admin",
-		element: (
-			<RequireAuth>
-				<DashboardWrapper>
-					<FeatureFlagGuard feature="SHOW_ADMIN">
-						{React.createElement(
-							React.lazy(() => import("@/pages/admin").then((module) => ({ default: module.Page })))
-						)}
-					</FeatureFlagGuard>
-				</DashboardWrapper>
-			</RequireAuth>
-		),
 	},
 	{
 		path: "errors",

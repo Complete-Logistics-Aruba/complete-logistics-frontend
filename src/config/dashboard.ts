@@ -20,56 +20,11 @@ const createNavItems = () => {
 	const items: NavItemConfig[] = [];
 
 	// 1. Dashboard
-	items.push({ key: "dashboard", title: "Dashboard", href: "/", icon: "house" });
+	items.push({ key: "dashboard", title: "Dashboard", href: "/dashboard", icon: "house" });
 
-	// 2. Consolidation
-	if (featureFlags.SHOW_CONSOLIDATION) {
-		items.push({ key: "consolidation", title: "Consolidation", href: paths.consolidation, icon: "cube" });
-	}
-
-	// 3. Full container (FCL)
-	if (featureFlags.SHOW_FCL) {
-		items.push({ key: "fcl", title: "Full container (FCL)", href: paths.fcl, icon: "cube" });
-	}
-
-	// 4. LCL
-	if (featureFlags.SHOW_LCL) {
-		items.push({ key: "lcl", title: "LCL", href: paths.lcl, icon: "cube" });
-	}
-
-	// 5. Air
-	if (featureFlags.SHOW_AIR) {
-		items.push({ key: "air", title: "Air", href: paths.air, icon: "upload" });
-	}
-
-	// 6. Invoicing
-	if (featureFlags.SHOW_INVOICING) {
-		items.push({ key: "invoicing", title: "Invoicing", href: paths.invoicing, icon: "receipt" });
-	}
-
-	// 7. Warehouse
+	// 2. Warehouse
 	if (featureFlags.SHOW_WAREHOUSE) {
-		items.push({ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "kanban" });
-	}
-
-	// 8. Brokerage
-	if (featureFlags.SHOW_BROKERAGE) {
-		items.push({ key: "brokerage", title: "Brokerage", href: paths.brokerage, icon: "briefcase" });
-	}
-
-	// 9. Documents
-	if (featureFlags.SHOW_DOCUMENTS) {
-		items.push({ key: "documents", title: "Documents", href: paths.documents, icon: "file" });
-	}
-
-	// 10. Data Management
-	if (featureFlags.SHOW_DATA) {
-		items.push({ key: "data", title: "Data Management", href: paths.data, icon: "chart-pie" });
-	}
-
-	// 11. Admin
-	if (featureFlags.SHOW_ADMIN) {
-		items.push({ key: "admin", title: "Admin", href: paths.admin, icon: "sliders-horizontal" });
+		items.push({ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "kanban" }, { key: "screen-0", title: "Screen 0: Product Master", href: paths.warehouseScreens.screen0, icon: "file-csv", roles: ["CSE"] }, { key: "screen-0b", title: "Screen 0B: Product Maintenance", href: paths.warehouseScreens.screen0b, icon: "pencil", roles: ["CSE"] }, { key: "screen-1", title: "Screen 1: Receiving Order", href: paths.warehouseScreens.screen1, icon: "inbox", roles: ["CSE"] }, { key: "screen-2", title: "Screen 2: Receiving Summary", href: paths.warehouseScreens.screen2, icon: "check-circle", roles: ["CSE"] }, { key: "screen-3", title: "Screen 3: Shipping Order", href: paths.warehouseScreens.screen3, icon: "package", roles: ["CSE"] }, { key: "screen-4", title: "Screen 4: Register Container", href: paths.warehouseScreens.screen4, icon: "package", roles: ["CSE"] }, { key: "screen-5", title: "Screen 5: Pending Receipts", href: paths.warehouseScreens.screen5, icon: "list", roles: ["WH"] }, { key: "screen-6", title: "Screen 6: Container Photos", href: paths.warehouseScreens.screen6, icon: "camera", roles: ["WH"] }, { key: "screen-7", title: "Screen 7: Pallet Tallying", href: paths.warehouseScreens.screen7, icon: "stack", roles: ["WH"] }, { key: "screen-8", title: "Screen 8: Put-Away Assignment", href: paths.warehouseScreens.screen8, icon: "cube", roles: ["WH"] }, { key: "screen-9", title: "Screen 9: Pending Orders", href: paths.warehouseScreens.screen9, icon: "list-checks", roles: ["WH"] }, { key: "screen-10", title: "Screen 10: Pick Pallets", href: paths.warehouseScreens.screen10, icon: "hand-picking", roles: ["WH"] });
 	}
 
 	return items;
