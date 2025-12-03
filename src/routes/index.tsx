@@ -17,13 +17,6 @@ const protectedDashboardRoute = {
 export const routes: RouteObject[] = [
 	{ index: true, element: <Navigate to="/dashboard" /> },
 	{
-		path: "health",
-		lazy: async () => {
-			const { Health } = await import("@/pages/health");
-			return { Component: Health };
-		},
-	},
-	{
 		path: "auth",
 		children: [
 			{
@@ -78,9 +71,9 @@ export const routes: RouteObject[] = [
 				),
 			},
 			{
-				path: "screen-3",
+				path: "screen-4",
 				element: React.createElement(
-					React.lazy(() => import("@/components/screens/Screen3").then((module) => ({ default: module.default })))
+					React.lazy(() => import("@/components/screens/Screen4").then((module) => ({ default: module.default })))
 				),
 			},
 			{
@@ -93,36 +86,6 @@ export const routes: RouteObject[] = [
 				path: "screen-6",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen6").then((module) => ({ default: module.Screen6 })))
-				),
-			},
-			{
-				path: "screen-7",
-				element: React.createElement(
-					React.lazy(() => import("@/components/screens/screen7").then((module) => ({ default: module.default })))
-				),
-			},
-			{
-				path: "screen-4",
-				element: React.createElement(
-					React.lazy(() => import("@/components/screens/Screen4").then((module) => ({ default: module.default })))
-				),
-			},
-			{
-				path: "screen-8",
-				element: React.createElement(
-					React.lazy(() => import("@/components/screens/screen8").then((module) => ({ default: module.default })))
-				),
-			},
-			{
-				path: "screen-9",
-				element: React.createElement(
-					React.lazy(() => import("@/components/screens/screen9").then((module) => ({ default: module.default })))
-				),
-			},
-			{
-				path: "screen-10",
-				element: React.createElement(
-					React.lazy(() => import("@/components/screens/Screen10").then((module) => ({ default: module.default })))
 				),
 			},
 		],
