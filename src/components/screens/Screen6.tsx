@@ -8,14 +8,16 @@ import {
 	CardContent,
 	Chip,
 	CircularProgress,
+	Container,
 	IconButton,
 	Paper,
 	Skeleton,
 	Typography,
+	useMediaQuery,
+	useTheme,
 } from "@mui/material";
 import {
 	ArrowRight as ArrowRightIcon,
-	ArrowLeft as BackIcon,
 	Camera as CameraIcon,
 	Check as CheckIcon,
 	X as DeleteIcon,
@@ -62,6 +64,8 @@ export const Screen6: React.FC = () => {
 	const { enqueueSnackbar } = useSnackbar();
 	const location = useLocation();
 	const locationState = location.state as LocationState | undefined;
+	const theme = useTheme();
+	const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
 
 	// State management - Orders List
 	const [orders, setOrders] = useState<ReceivingOrder[]>([]);
@@ -202,15 +206,28 @@ export const Screen6: React.FC = () => {
 	// If no order selected, show orders list
 	if (!selectedOrder && !locationState) {
 		return (
-			<Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
-				<Button startIcon={<BackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>
+			<Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
+				{/* <Button startIcon={<BackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>
 					Back
-				</Button>
+				</Button> */}
 
-				<Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: "bold" }}>
+				<Typography 
+					variant="h4" 
+					component="h1" 
+					gutterBottom 
+					sx={{ 
+						fontWeight: "bold",
+						fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+					}}
+				>
 					📦 Container Photos
 				</Typography>
-				<Typography variant="body2" color="textSecondary" paragraph sx={{ mb: 3 }}>
+				<Typography 
+					variant="body2" 
+					color="textSecondary" 
+					paragraph 
+					sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}
+				>
 					Select a receiving order to capture container photos
 				</Typography>
 
@@ -280,14 +297,14 @@ export const Screen6: React.FC = () => {
 											</Typography>
 										</Box>
 
-										<Box sx={{ mb: 2 }}>
+										{/* <Box sx={{ mb: 2 }}>
 											<Typography variant="caption" color="textSecondary">
 												Expected Items
 											</Typography>
 											<Typography variant="body2" sx={{ fontWeight: "bold" }}>
 												📦 {order.expected_items_count || 0} items
 											</Typography>
-										</Box>
+										</Box> */}
 
 										<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
 											<Chip
@@ -304,24 +321,52 @@ export const Screen6: React.FC = () => {
 						))}
 					</Box>
 				)}
-			</Box>
+			</Container>
 		);
 	}
 
 	// If order selected or coming from Screen 1, show photo upload interface
 	return (
-		<Box sx={{ p: 3, maxWidth: 1000, mx: "auto" }}>
-			<Typography variant="h4" component="h1" sx={{ fontWeight: "bold", mb: 1 }}>
+		<Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2, md: 3 }, px: { xs: 1, sm: 2, md: 3 } }}>
+			<Typography 
+				variant="h4" 
+				component="h1" 
+				sx={{ 
+					fontWeight: "bold", 
+					mb: 1,
+					fontSize: { xs: '1.25rem', sm: '1.75rem', md: '2.25rem', lg: '2.5rem' }
+				}}
+			>
 				Container Photos
 			</Typography>
-			<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+			<Typography 
+				variant="body2" 
+				color="textSecondary" 
+				sx={{ mb: 2, fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' } }}
+			>
 				Container: <strong>{containerNum}</strong>
 			</Typography>
 
-			<Paper elevation={1} sx={{ p: 4, mb: 4, backgroundColor: "#f9f9f9" }}>
+			<Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2, md: 3, lg: 4 }, mb: 3, backgroundColor: "#f9f9f9" }}>
 				{/* Header with title and progress badge */}
-				<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-					<Typography variant="h6" sx={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
+				<Box sx={{ 
+					display: "flex", 
+					justifyContent: "space-between", 
+					alignItems: { xs: 'flex-start', sm: 'center' },
+					flexDirection: { xs: 'column', sm: 'row' },
+					gap: { xs: 2, sm: 0 },
+					mb: 3 
+				}}>
+					<Typography 
+						variant="h6" 
+						sx={{ 
+							fontWeight: "bold", 
+							display: "flex", 
+							alignItems: "center", 
+							gap: 1,
+							fontSize: { xs: '1rem', sm: '1.25rem' }
+						}}
+					>
 						<CameraIcon size={24} />
 						Capture Photos
 					</Typography>
@@ -340,8 +385,8 @@ export const Screen6: React.FC = () => {
 					sx={{
 						display: "grid",
 						gridTemplateColumns: "repeat(3, 1fr)",
-						gap: 2,
-						mb: 3,
+						gap: { xs: 0.75, sm: 1, md: 1.25, lg: 1.5 },
+						mb: 2,
 					}}
 				>
 					{[0, 1, 2].map((index) => (
@@ -349,18 +394,21 @@ export const Screen6: React.FC = () => {
 							key={index}
 							variant="outlined"
 							sx={{
-								p: 2,
+								p: { xs: 0.5, sm: 0.75, md: 1, lg: 1.25 },
 								display: "flex",
 								flexDirection: "column",
 								alignItems: "center",
 								justifyContent: "center",
-								minHeight: 240,
+								width: "100%",
+								minHeight: { xs: 160, sm: 180, md: 220, lg: 280 },
+								maxHeight: { xs: 350, sm: 400, md: 480, lg: 550 },
 								position: "relative",
 								border: "2px dashed #ccc",
-								borderRadius: 2,
+								borderRadius: 1,
 								backgroundColor: photos[index] ? "#f5f5f5" : "transparent",
 								transition: "all 0.3s ease",
 								cursor: "pointer",
+								overflow: "auto",
 								"&:hover": {
 									borderColor: "#999",
 									backgroundColor: "#fafafa",
@@ -372,10 +420,10 @@ export const Screen6: React.FC = () => {
 									sx={{
 										position: "relative",
 										width: "100%",
-										height: "100%",
 										display: "flex",
 										alignItems: "center",
 										justifyContent: "center",
+										p: 1,
 									}}
 								>
 									<Box
@@ -386,7 +434,7 @@ export const Screen6: React.FC = () => {
 											maxWidth: "100%",
 											maxHeight: "100%",
 											objectFit: "contain",
-											borderRadius: 1,
+											borderRadius: 0.5,
 										}}
 									/>
 									<IconButton
@@ -452,23 +500,27 @@ export const Screen6: React.FC = () => {
 			</Paper>
 
 			{/* Action buttons */}
-			<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 2 }}>
+			<Box sx={{ 
+				display: "grid", 
+				gridTemplateColumns: { xs: "1fr", sm: "1fr 1.5fr" },
+				gap: { xs: 1.5, sm: 2 }
+			}}>
 				<Button
 					variant="outlined"
-					size="large"
+					size={isTablet ? 'medium' : 'large'}
 					onClick={selectedOrder ? handleBackToOrdersList : () => navigate(-1)}
-					sx={{ py: 1.5 }}
+					sx={{ py: { xs: 1, sm: 1.5 } }}
 				>
 					Back
 				</Button>
 				<Button
 					variant="contained"
-					size="large"
+					size={isTablet ? 'medium' : 'large'}
 					onClick={handleSubmit}
 					disabled={isSubmitting || !allPhotosUploaded}
 					startIcon={isSubmitting ? <CircularProgress size={20} /> : undefined}
 					sx={{
-						py: 1.5,
+						py: { xs: 1, sm: 1.5 },
 						backgroundColor: "#5b7cfa",
 						"&:hover": {
 							backgroundColor: "#4c6ef5",
@@ -481,7 +533,7 @@ export const Screen6: React.FC = () => {
 					{isSubmitting ? "Uploading..." : "Continue"}
 				</Button>
 			</Box>
-		</Box>
+		</Container>
 	);
 };
 

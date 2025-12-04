@@ -219,14 +219,14 @@ export const products = {
 	/**
 	 * Update product
 	 *
-	 * @param id - Product ID
+	 * @param itemId - Product item_id (primary key)
 	 * @param updates - Partial product data to update
 	 * @returns Updated product
 	 * @throws Error with user-friendly message
 	 */
-	async update(id: string, updates: Partial<Product>): Promise<Product> {
+	async update(itemId: string, updates: Partial<Product>): Promise<Product> {
 		try {
-			const { data, error } = await supabase.from("products").update(updates).eq("id", id).select().single();
+			const { data, error } = await supabase.from("products").update(updates).eq("item_id", itemId).select().single();
 
 			if (error) {
 				throw error;
@@ -680,7 +680,7 @@ export const shippingOrders = {
 			// Supabase returns it as shipping_order_lines, but we want it as lines
 			return {
 				...data,
-				lines: (data as any).shipping_order_lines || data.lines || [],
+				lines: (data as unknown as Record<string, unknown>).shipping_order_lines || data.lines || [],
 			};
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Failed to load shipping order"));

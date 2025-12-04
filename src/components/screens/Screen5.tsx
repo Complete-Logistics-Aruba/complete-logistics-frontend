@@ -2,14 +2,14 @@
 /**
  * Screen 5: Pending Receipts
  *
- * WH user views receiving orders ready for put-away.
- * Shows orders with status=Staged (photos captured, pallets tallied).
+ * WH user views receiving orders ready for container photos.
+ * Shows orders with status=Pending (created by CSE, awaiting warehouse processing).
  *
  * Story: Pending Receipts List
  * Acceptance Criteria:
- * 1. Display list of receiving orders with status=Staged
+ * 1. Display list of receiving orders with status=Pending
  * 2. Show: Order ID, Container #, Seal #, Created Date, Item Count
- * 3. Click order to navigate to Screen 8 (Put-Away)
+ * 3. Click order to navigate to Screen 6 (Container Photos)
  * 4. Loading state while fetching
  * 5. Empty state if no pending receipts
  */
@@ -18,20 +18,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Button,
   Card,
+  CardActionArea,
+  CardContent,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Typography,
-  Paper,
   Chip,
+  Container,
 } from '@mui/material';
-import { ArrowRightIcon } from '@phosphor-icons/react/dist/ssr/ArrowRight';
 import { useSnackbar } from 'notistack';
 import { receivingOrders, receivingOrderLines } from '../../lib/api/wms-api';
 
@@ -60,12 +54,12 @@ export default function Screen5() {
         // Fetch all receiving orders
         const allOrders = await receivingOrders.list();
 
-        // Filter for staged orders
-        const stagedOrders = allOrders.filter((order) => order.status === 'Staged');
+        // Filter for pending orders (awaiting container photos)
+        const pendingOrders = allOrders.filter((order) => order.status === 'Pending');
 
         // For each order, count the items
         const receiptsWithCounts: PendingReceipt[] = [];
-        for (const order of stagedOrders) {
+        for (const order of pendingOrders) {
           const lines = await receivingOrderLines.getByReceivingOrderId(order.id);
           receiptsWithCounts.push({
             id: order.id,
@@ -90,14 +84,34 @@ export default function Screen5() {
     loadReceipts();
   }, [enqueueSnackbar]);
 
-  const handleSelectReceipt = (receipt: PendingReceipt) => {
-    navigate('/warehouse/screen-8', {
-      state: {
-        receivingOrderId: receipt.id,
-        containerNum: receipt.container_num,
-        sealNum: receipt.seal_num,
-      },
-    });
+  const handleSelectReceipt = async (receipt: PendingReceipt) => {
+    try {
+      // Update status to "Unloading"
+      await receivingOrders.update(receipt.id, {
+        status: 'Unloading',
+      });
+
+      // Update local state
+      setReceipts((prev) =>
+        prev.map((r) =>
+          r.id === receipt.id ? { ...r, status: 'Unloading' } : r
+        )
+      );
+
+      // Navigate to Screen 6
+      navigate('/warehouse/screen-6', {
+        state: {
+          receivingOrderId: receipt.id,
+          containerNum: receipt.container_num,
+          sealNum: receipt.seal_num,
+        },
+      });
+
+      enqueueSnackbar('Status updated to Unloading', { variant: 'success' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update status';
+      enqueueSnackbar(`Error: ${message}`, { variant: 'error' });
+    }
   };
 
   if (isLoading) {
@@ -109,14 +123,25 @@ export default function Screen5() {
   }
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 'bold', 
+            mb: 1,
+            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+          }}
+        >
           📦 Pending Receipts
         </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Receiving orders ready for put-away. Click an order to begin put-away process.
+        <Typography 
+          variant="body2" 
+          color="textSecondary"
+          sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+        >
+          Receiving orders awaiting container photos. Click an order to capture photos.
         </Typography>
       </Box>
 
@@ -131,66 +156,108 @@ export default function Screen5() {
           </Typography>
         </Card>
       ) : (
-        /* Receipts Table */
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell>Order ID</TableCell>
-                <TableCell>Container #</TableCell>
-                <TableCell>Seal #</TableCell>
-                <TableCell align="center">Items</TableCell>
-                <TableCell>Created Date</TableCell>
-                <TableCell align="center">Status</TableCell>
-                <TableCell align="right">Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {receipts.map((receipt) => (
-                <TableRow
-                  key={receipt.id}
-                  hover
-                  sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
-                      backgroundColor: '#f9f9f9',
-                    },
-                  }}
+        /* Receipts Cards Grid */
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+            gap: { xs: 2, sm: 3, md: 3 },
+          }}
+        >
+          {receipts.map((receipt) => (
+            <Box key={receipt.id}>
+              <Card
+                sx={{
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  '&:hover': {
+                    boxShadow: 6,
+                    transform: 'translateY(-8px)',
+                  },
+                }}
+              >
+                <CardActionArea 
+                  onClick={() => handleSelectReceipt(receipt)}
+                  sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
                 >
-                  <TableCell sx={{ fontWeight: 'bold' }}>
-                    {receipt.id.slice(0, 8)}...
-                  </TableCell>
-                  <TableCell>{receipt.container_num}</TableCell>
-                  <TableCell>{receipt.seal_num}</TableCell>
-                  <TableCell align="center">
-                    <Chip label={receipt.item_count} size="small" variant="outlined" />
-                  </TableCell>
-                  <TableCell>
-                    {new Date(receipt.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={receipt.status}
-                      size="small"
-                      color="warning"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      endIcon={<ArrowRightIcon size={16} />}
-                      onClick={() => handleSelectReceipt(receipt)}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Start Put-Away
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  <CardContent sx={{ width: '100%', flexGrow: 1 }}>
+                    {/* Container Number */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography 
+                        variant="caption" 
+                        color="textSecondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
+                        Container #
+                      </Typography>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          fontSize: { xs: '1rem', sm: '1.25rem' }
+                        }}
+                      >
+                        {receipt.container_num}
+                      </Typography>
+                    </Box>
+
+                    {/* Seal Number */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography 
+                        variant="caption" 
+                        color="textSecondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
+                        Seal #
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ fontWeight: 'bold' }}
+                      >
+                        {receipt.seal_num}
+                      </Typography>
+                    </Box>
+
+                    {/* Created Date */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography 
+                        variant="caption" 
+                        color="textSecondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
+                        Created Date
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ fontWeight: 'bold' }}
+                      >
+                        {new Date(receipt.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+
+                    {/* Status and Items */}
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip
+                        label={receipt.status}
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={`${receipt.item_count} items`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Box>
+          ))}
+        </Box>
       )}
 
       {/* Summary */}
@@ -201,6 +268,6 @@ export default function Screen5() {
           </Typography>
         </Box>
       )}
-    </Box>
+    </Container>
   );
 }

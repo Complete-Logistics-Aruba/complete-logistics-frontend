@@ -25,13 +25,35 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Button,
+  Chip,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import { useSnackbar } from 'notistack';
+import { Download as DownloadIcon } from '@phosphor-icons/react/dist/ssr/Download';
 import { FileUpload, ErrorAlert, SuccessAlert, LoadingSpinner } from '@/components/core';
 import { validateProductMasterCSV } from '@/utils/csv-validation';
 import { wmsApi } from '@/lib/api';
 import { supabase } from '@/lib/auth/supabase-client';
+
+const downloadTemplate = () => {
+  const csvContent = `item_id,description,units_per_pallet,pallet_positions
+PROD-001,Premium Wireless Headphones,500,1
+PROD-002,Mechanical Gaming Keyboard RGB,500,1
+PROD-003,27-inch 4K Monitor,500,1
+PROD-004,Ergonomic Office Chair,500,1
+PROD-005,500GB NVMe SSD,500,1`;
+
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = globalThis.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'product-master-template.csv';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  globalThis.URL.revokeObjectURL(url);
+};
 
 /**
  * Screen 0 Component - Product Master Upload
@@ -86,7 +108,7 @@ export function Screen0() {
       // Must delete in order: receiving_order_lines → receiving_orders → pallets → products
       try {
         console.log('Clearing existing data (cascade delete)...');
-        
+
         // Step 1: Delete receiving order lines
         console.log('Deleting receiving order lines...');
         const { error: deleteLineError } = await supabase
@@ -97,7 +119,7 @@ export function Screen0() {
           console.error('Error deleting receiving order lines:', deleteLineError);
           throw deleteLineError;
         }
-        
+
         // Step 2: Delete shipping order lines
         console.log('Deleting shipping order lines...');
         const { error: deleteShippingLineError } = await supabase
@@ -108,7 +130,7 @@ export function Screen0() {
           console.error('Error deleting shipping order lines:', deleteShippingLineError);
           throw deleteShippingLineError;
         }
-        
+
         // Step 3: Delete pallets
         console.log('Deleting pallets...');
         const { error: deletePalletError } = await supabase
@@ -119,7 +141,7 @@ export function Screen0() {
           console.error('Error deleting pallets:', deletePalletError);
           throw deletePalletError;
         }
-        
+
         // Step 4: Delete receiving orders
         console.log('Deleting receiving orders...');
         const { error: deleteReceivingError } = await supabase
@@ -130,7 +152,7 @@ export function Screen0() {
           console.error('Error deleting receiving orders:', deleteReceivingError);
           throw deleteReceivingError;
         }
-        
+
         // Step 5: Delete shipping orders
         console.log('Deleting shipping orders...');
         const { error: deleteShippingError } = await supabase
@@ -141,7 +163,7 @@ export function Screen0() {
           console.error('Error deleting shipping orders:', deleteShippingError);
           throw deleteShippingError;
         }
-        
+
         // Step 6: Delete products
         console.log('Deleting products...');
         const { error: deleteProductError } = await supabase
@@ -152,7 +174,7 @@ export function Screen0() {
           console.error('Error deleting products:', deleteProductError);
           throw deleteProductError;
         }
-        
+
         console.log('Successfully cleared all existing data');
       } catch (error_) {
         let message = 'Unknown error';
@@ -224,32 +246,121 @@ export function Screen0() {
             </Typography>
           </Box>
 
-          {/* Instructions */}
-          <Card>
+          {/* CSV Format Instructions */}
+          <Card sx={{ border: '2px solid #e3f2fd' }}>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-                CSV Format
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                Your CSV file must contain the following columns:
-              </Typography>
-              <Box component="pre" sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 1, overflow: 'auto' }}>
-                <Typography variant="caption" component="div">
-                  item_id,description,units_per_pallet,pallet_positions
-                </Typography>
-                <Typography variant="caption" component="div">
-                  ABC123,Widget A,10,1
-                </Typography>
-                <Typography variant="caption" component="div">
-                  DEF456,Widget B,20,2
-                </Typography>
-              </Box>
-              <Typography variant="body2" sx={{ mt: 2 }}>
-                <strong>Required fields:</strong> item_id, units_per_pallet
-              </Typography>
-              <Typography variant="body2">
-                <strong>Optional fields:</strong> description, pallet_positions (defaults to 1)
-              </Typography>
+              <Stack spacing={3}>
+                {/* Header */}
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    📋 CSV Format Requirements
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Your CSV file must contain the following columns in this exact order:
+                  </Typography>
+                </Box>
+
+                {/* Column Specifications Table */}
+                <TableContainer component={Paper} sx={{ bgcolor: '#fafafa' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#e3f2fd' }}>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Column Name</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Example</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <code>item_id</code>
+                            <Chip label="Required" size="small" color="error" variant="outlined" />
+                          </Box>
+                        </TableCell>
+                        <TableCell>Text</TableCell>
+                        <TableCell>Unique product identifier</TableCell>
+                        <TableCell><code>PROD-001</code></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <code>description</code>
+                            <Chip label="Optional" size="small" color="warning" variant="outlined" />
+                          </Box>
+                        </TableCell>
+                        <TableCell>Text</TableCell>
+                        <TableCell>Product name/description</TableCell>
+                        <TableCell><code>Wireless Headphones</code></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <code>units_per_pallet</code>
+                            <Chip label="Required" size="small" color="error" variant="outlined" />
+                          </Box>
+                        </TableCell>
+                        <TableCell>Number</TableCell>
+                        <TableCell>Units that fit on one pallet</TableCell>
+                        <TableCell><code>500</code></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <code>pallet_positions</code>
+                            <Chip label="Optional" size="small" color="warning" variant="outlined" />
+                          </Box>
+                        </TableCell>
+                        <TableCell>Number</TableCell>
+                        <TableCell>Number of pallet positions (defaults to 1)</TableCell>
+                        <TableCell><code>1</code></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                {/* Example CSV */}
+                {/* <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    ✅ Example CSV Format:
+                  </Typography>
+                  <Box
+                    component="pre"
+                    sx={{
+                      bgcolor: '#f5f5f5',
+                      p: 2,
+                      borderRadius: 1,
+                      overflow: 'auto',
+                      border: '1px solid #ddd',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    {`item_id,description,units_per_pallet,pallet_positions
+PROD-001,Premium Wireless Headphones,500,1
+PROD-002,Mechanical Gaming Keyboard RGB,500,1
+PROD-003,27-inch 4K Monitor,500,1
+PROD-004,Ergonomic Office Chair,500,1
+PROD-005,500GB NVMe SSD,500,1`}
+                  </Box>
+                </Box> */}
+
+                {/* Download Template Button */}
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadIcon size={20} />}
+                    onClick={downloadTemplate}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Download CSV Template
+                  </Button>
+                  <Alert severity="info" sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                    💡 Download the template to get started quickly
+                  </Alert>
+                </Box>
+              </Stack>
             </CardContent>
           </Card>
 

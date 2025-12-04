@@ -88,6 +88,12 @@ export const routes: RouteObject[] = [
 					React.lazy(() => import("@/components/screens/Screen6").then((module) => ({ default: module.Screen6 })))
 				),
 			},
+			{
+				path: "screen-7",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen7").then((module) => ({ default: module.default })))
+				),
+			},
 		],
 	},
 	{

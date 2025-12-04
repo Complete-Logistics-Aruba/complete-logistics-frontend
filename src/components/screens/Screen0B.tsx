@@ -23,7 +23,6 @@ import {
   TextField,
   Alert,
   CircularProgress,
-  Chip,
   Table,
   TableBody,
   TableCell,
@@ -32,6 +31,7 @@ import {
   TableRow,
   Paper,
   TablePagination,
+  Switch,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import { useSnackbar } from 'notistack';
@@ -62,7 +62,7 @@ export function Screen0B() {
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ itemId: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState<unknown>('');
 
   const loadProducts = useCallback(async () => {
@@ -95,8 +95,8 @@ export function Screen0B() {
   });
 
   // Handle edit product
-  const handleEditProduct = async (productId: string, field: string, value: unknown) => {
-    const product = products.find((p) => p.id === productId);
+  const handleEditProduct = async (itemId: string, field: string, value: unknown) => {
+    const product = products.find((p) => p.item_id === itemId);
 
     if (!product) return;
 
@@ -112,12 +112,12 @@ export function Screen0B() {
     }
 
     try {
-      const updatedProduct = await wmsApi.products.update(productId, {
+      const updatedProduct = await wmsApi.products.update(itemId, {
         [field]: value,
       });
 
       setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? updatedProduct : p))
+        prev.map((p) => (p.item_id === itemId ? updatedProduct : p))
       );
 
       enqueueSnackbar('Product updated successfully', { variant: 'success' });
@@ -254,6 +254,7 @@ export function Screen0B() {
                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Units per Pallet</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }} align="right">Pallet Positions</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }} align="center">Active</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }} align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -261,13 +262,13 @@ export function Screen0B() {
                     <TableRow key={product.id} hover>
                       <TableCell>{product.item_id}</TableCell>
                       <TableCell>
-                        {editingCell?.id === product.id && editingCell?.field === 'description' ? (
+                        {editingCell?.itemId === product.item_id && editingCell?.field === 'description' ? (
                           <TextField
                             size="small"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={() => {
-                              handleEditProduct(product.id, 'description', editValue);
+                              handleEditProduct(product.item_id, 'description', editValue);
                               setEditingCell(null);
                             }}
                             autoFocus
@@ -275,7 +276,7 @@ export function Screen0B() {
                         ) : (
                           <Box
                             onClick={() => {
-                              setEditingCell({ id: product.id, field: 'description' });
+                              setEditingCell({ itemId: product.item_id, field: 'description' });
                               setEditValue(product.description);
                             }}
                             sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0', p: 0.5 } }}
@@ -285,14 +286,14 @@ export function Screen0B() {
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        {editingCell?.id === product.id && editingCell?.field === 'units_per_pallet' ? (
+                        {editingCell?.itemId === product.item_id && editingCell?.field === 'units_per_pallet' ? (
                           <TextField
                             size="small"
                             type="number"
                             value={editValue}
                             onChange={(e) => setEditValue(Number.parseInt(e.target.value, 10))}
                             onBlur={() => {
-                              handleEditProduct(product.id, 'units_per_pallet', editValue);
+                              handleEditProduct(product.item_id, 'units_per_pallet', editValue);
                               setEditingCell(null);
                             }}
                             autoFocus
@@ -301,7 +302,7 @@ export function Screen0B() {
                         ) : (
                           <Box
                             onClick={() => {
-                              setEditingCell({ id: product.id, field: 'units_per_pallet' });
+                              setEditingCell({ itemId: product.item_id, field: 'units_per_pallet' });
                               setEditValue(product.units_per_pallet);
                             }}
                             sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0', p: 0.5 } }}
@@ -311,14 +312,14 @@ export function Screen0B() {
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        {editingCell?.id === product.id && editingCell?.field === 'pallet_positions' ? (
+                        {editingCell?.itemId === product.item_id && editingCell?.field === 'pallet_positions' ? (
                           <TextField
                             size="small"
                             type="number"
                             value={editValue}
                             onChange={(e) => setEditValue(Number.parseInt(e.target.value, 10))}
                             onBlur={() => {
-                              handleEditProduct(product.id, 'pallet_positions', editValue);
+                              handleEditProduct(product.item_id, 'pallet_positions', editValue);
                               setEditingCell(null);
                             }}
                             autoFocus
@@ -327,7 +328,7 @@ export function Screen0B() {
                         ) : (
                           <Box
                             onClick={() => {
-                              setEditingCell({ id: product.id, field: 'pallet_positions' });
+                              setEditingCell({ itemId: product.item_id, field: 'pallet_positions' });
                               setEditValue(product.pallet_positions);
                             }}
                             sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0', p: 0.5 } }}
@@ -337,33 +338,23 @@ export function Screen0B() {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {editingCell?.id === product.id && editingCell?.field === 'active' ? (
-                          <Box
-                            component="select"
-                            value={editValue ? 'true' : 'false'}
-                            onChange={(e) => {
-                              const newValue = e.currentTarget.value === 'true';
-                              handleEditProduct(product.id, 'active', newValue);
-                              setEditingCell(null);
-                            }}
-                            autoFocus
-                            sx={{ p: 0.5 }}
-                          >
-                            <option value="true">Active</option>
-                            <option value="false">Inactive</option>
-                          </Box>
-                        ) : (
-                          <Chip
-                            label={product.active ? 'Active' : 'Inactive'}
-                            color={product.active ? 'success' : 'default'}
-                            size="small"
-                            onClick={() => {
-                              setEditingCell({ id: product.id, field: 'active' });
-                              setEditValue(product.active);
-                            }}
-                            sx={{ cursor: 'pointer' }}
-                          />
-                        )}
+                        <Switch
+                          checked={product.active}
+                          onChange={(e) => handleEditProduct(product.item_id, 'active', e.target.checked)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setEditingCell({ itemId: product.item_id, field: 'description' });
+                            setEditValue(product.description);
+                          }}
+                        >
+                          Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -430,6 +421,16 @@ export function Screen0B() {
                   disabled={submitting}
                   inputProps={{ min: 1 }}
                 />
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1 }}>
+                  <Typography variant="body2">
+                    Status: <strong>{newProduct.active ? 'Active' : 'Inactive'}</strong>
+                  </Typography>
+                  <Switch
+                    checked={newProduct.active}
+                    onChange={(e) => setNewProduct({ ...newProduct, active: e.target.checked })}
+                    disabled={submitting}
+                  />
+                </Box>
               </Stack>
             </DialogContent>
             <DialogActions>

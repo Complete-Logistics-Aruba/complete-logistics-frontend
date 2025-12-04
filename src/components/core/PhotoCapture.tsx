@@ -124,23 +124,36 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           )}
         </Box>
       ) : (
-        <Stack direction="row" spacing={2}>
+        <Stack direction="column" spacing={0.5} sx={{ width: '100%' }}>
           <Button
             variant="outlined"
-            startIcon={<CameraIcon size={20} />}
+            startIcon={<CameraIcon size={14} />}
             onClick={() => cameraInputRef.current?.click()}
             disabled={loading}
             fullWidth
+            size="small"
+            sx={{ 
+              fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.875rem' },
+              py: { xs: 0.5, sm: 0.75 },
+              px: { xs: 0.5, sm: 1 }
+            }}
           >
-            Take Photo
+            Capture
           </Button>
           <Button
             variant="outlined"
+            startIcon={<CameraIcon size={14} />}
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
             fullWidth
+            size="small"
+            sx={{ 
+              fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.875rem' },
+              py: { xs: 0.5, sm: 0.75 },
+              px: { xs: 0.5, sm: 1 }
+            }}
           >
-            Upload Photo
+            Upload
           </Button>
         </Stack>
       )}

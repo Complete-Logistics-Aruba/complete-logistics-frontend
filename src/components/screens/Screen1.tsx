@@ -37,7 +37,6 @@ import {
 import { useSnackbar } from "notistack";
 import { Helmet } from "react-helmet-async";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import type { Product, User } from "@/types/domain";
@@ -58,7 +57,6 @@ type ReceivingOrderFormData = z.infer<typeof receivingOrderSchema>;
  * @returns Screen1 component
  */
 export function Screen1() {
-	const navigate = useNavigate();
 	const { enqueueSnackbar } = useSnackbar();
 	const [loading, setLoading] = useState(false);
 	const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -209,7 +207,8 @@ export function Screen1() {
 
 	const handleConfirmClose = () => {
 		setShowConfirmModal(false);
-		navigate("/warehouse"); // Navigate to warehouse home
+		// Don't navigate - CSE user stays on Screen 1
+		// WH user will access Screen 5 from sidebar independently
 	};
 
 	return (
@@ -375,13 +374,13 @@ export function Screen1() {
 							<strong>Items:</strong> {csvData?.length}
 						</Typography>
 						<Alert severity="success">
-							Receiving order has been created successfully. You can now proceed to the next step.
+							Receiving order has been created successfully. The warehouse team will now process this order starting with container photos (Screen 5).
 						</Alert>
 					</Stack>
 				</DialogContent>
 				<DialogActions>
 					<Button onClick={handleConfirmClose} variant="contained">
-						Continue
+						Close
 					</Button>
 				</DialogActions>
 			</Dialog>

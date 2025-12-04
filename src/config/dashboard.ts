@@ -22,10 +22,9 @@ const createNavItems = () => {
 	// 1. Dashboard
 	items.push({ key: "dashboard", title: "Dashboard", href: "/dashboard", icon: "house" });
 
-	// 2. Warehouse (Milestone 1 screens only)
+	// 2. Screens (without Warehouse parent menu)
 	if (featureFlags.SHOW_WAREHOUSE) {
 		items.push(
-			{ key: "warehouse", title: "Warehouse", href: paths.warehouse, icon: "kanban" },
 			{
 				key: "screen-0",
 				title: "Screen 0: Product Master",
@@ -48,20 +47,6 @@ const createNavItems = () => {
 				roles: ["CSE"],
 			},
 			{
-				key: "screen-2",
-				title: "Screen 2: Receiving Summary",
-				href: paths.warehouseScreens.screen2,
-				icon: "check-circle",
-				roles: ["CSE"],
-			},
-			{
-				key: "screen-4",
-				title: "Screen 4: Register Container",
-				href: paths.warehouseScreens.screen4,
-				icon: "package",
-				roles: ["CSE"],
-			},
-			{
 				key: "screen-5",
 				title: "Screen 5: Pending Receipts",
 				href: paths.warehouseScreens.screen5,
@@ -73,6 +58,13 @@ const createNavItems = () => {
 				title: "Screen 6: Container Photos",
 				href: paths.warehouseScreens.screen6,
 				icon: "camera",
+				roles: ["WH"],
+			},
+			{
+				key: "screen-7",
+				title: "Screen 7: Tally Pallets",
+				href: paths.warehouseScreens.screen7,
+				icon: "package",
 				roles: ["WH"],
 			}
 		);
