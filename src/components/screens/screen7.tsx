@@ -28,10 +28,10 @@ import {
 	Box,
 	Button,
 	Card,
-	Container,
 	CardContent,
 	Chip,
 	CircularProgress,
+	Container,
 	Paper,
 	Table,
 	TableBody,
@@ -90,7 +90,7 @@ export default function Screen7() {
 	const { enqueueSnackbar } = useSnackbar();
 	const { user } = useAuth();
 	const theme = useTheme();
-	const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+	const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
 	const { receivingOrderId, containerNum, sealNum } = location.state || {};
 
@@ -325,10 +325,14 @@ export default function Screen7() {
 
 	// Finish tally
 	const handleFinishTally = async () => {
+		const totalExpected = rows.reduce((sum, row) => sum + row.expectedPallets, 0);
 		const totalConfirmed = rows.reduce((sum, row) => sum + row.confirmedPallets.length, 0);
 
-		if (totalConfirmed === 0) {
-			enqueueSnackbar("Confirm at least 1 pallet before finishing", { variant: "warning" });
+		if (totalConfirmed < totalExpected) {
+			enqueueSnackbar(
+				`Confirm all ${totalExpected} pallets before finishing. Currently confirmed: ${totalConfirmed}/${totalExpected}`,
+				{ variant: "warning" }
+			);
 			return;
 		}
 
@@ -341,17 +345,17 @@ export default function Screen7() {
 			});
 
 			// Role-based navigation
-			if (user?.role === "WH") {
-				// WH User: Show toast and navigate to Screen 5 (Pending Receipts)
-				enqueueSnackbar("✅ Pallets tallied successfully! Awaiting CSE review.", {
+			if (user?.role === "Warehouse") {
+				// Warehouse User: Show toast and navigate to Screen 5 (Pending Receipts)
+				enqueueSnackbar("✅ Pallets tallied successfully! Awaiting Customer Service review.", {
 					variant: "success",
 				});
 
 				setTimeout(() => {
 					navigate("/warehouse/screen-5");
 				}, 1500);
-			} else if (user?.role === "CSE") {
-				// CSE User: Navigate to Screen 2 (Receiving Summary)
+			} else if (user?.role === "Customer Service") {
+				// Customer Service User: Navigate to Screen 2 (Receiving Summary)
 				enqueueSnackbar("✅ Tally finished! Order status set to Staged", {
 					variant: "success",
 				});
@@ -399,21 +403,22 @@ export default function Screen7() {
 		);
 	}
 
+	const totalExpected = rows.reduce((sum, row) => sum + row.expectedPallets, 0);
 	const totalConfirmed = rows.reduce((sum, row) => sum + row.confirmedPallets.length, 0);
-	const isFinishEnabled = totalConfirmed > 0;
+	const isFinishEnabled = totalConfirmed === totalExpected && totalExpected > 0;
 
 	return (
 		<Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
 			{/* Header */}
-			<Box sx={{ display: "flex", alignItems: "center", mb: 3, flexWrap: 'wrap', gap: 1 }}>
+			<Box sx={{ display: "flex", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
 				<Button startIcon={<ArrowLeftIcon size={20} />} onClick={() => navigate(-1)} sx={{ mr: 2 }}>
 					Back
 				</Button>
-				<Typography 
-					variant="h5" 
-					sx={{ 
+				<Typography
+					variant="h5"
+					sx={{
 						fontWeight: "bold",
-						fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' }
+						fontSize: { xs: "1.25rem", sm: "1.5rem", md: "1.75rem" },
 					}}
 				>
 					Pallet Tallying
@@ -423,11 +428,13 @@ export default function Screen7() {
 			{/* Order Info */}
 			<Card sx={{ mb: 3 }}>
 				<CardContent>
-					<Box sx={{ 
-						display: "grid", 
-						gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" },
-						gap: { xs: 1.5, sm: 2 }
-					}}>
+					<Box
+						sx={{
+							display: "grid",
+							gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" },
+							gap: { xs: 1.5, sm: 2 },
+						}}
+					>
 						<Box>
 							<Typography variant="caption" color="textSecondary">
 								Container #
@@ -448,22 +455,50 @@ export default function Screen7() {
 							<Typography variant="caption" color="textSecondary">
 								Status
 							</Typography>
-							<Chip label={receivingOrder.status} size="small" />
+							<Chip
+								label={receivingOrder.status}
+								size="small"
+								sx={{
+									mt: 0.5,
+									backgroundColor:
+										receivingOrder.status === "Unloading"
+											? "#fff3e0"
+											: receivingOrder.status === "Staged"
+												? "#e8f5e9"
+												: receivingOrder.status === "Received"
+													? "#e3f2fd"
+													: "#f5f5f5",
+									color:
+										receivingOrder.status === "Unloading"
+											? "#e65100"
+											: receivingOrder.status === "Staged"
+												? "#2e7d32"
+												: receivingOrder.status === "Received"
+													? "#1565c0"
+													: "#666",
+									fontWeight: 600,
+									fontSize: "0.875rem",
+								}}
+							/>
 						</Box>
 					</Box>
 				</CardContent>
 			</Card>
 
 			{/* Pallet Table */}
-			<TableContainer component={Paper} sx={{ mb: 3, overflowX: 'auto' }}>
-				<Table size={isTablet ? 'small' : 'medium'}>
+			<TableContainer component={Paper} sx={{ mb: 3, overflowX: "auto" }}>
+				<Table size={isTablet ? "small" : "medium"}>
 					<TableHead>
 						<TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-							<TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Item ID</TableCell>
-							<TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Description</TableCell>
-							<TableCell align="right" sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Expected Qty</TableCell>
-							<TableCell align="right" sx={{ display: { xs: 'none', md: 'table-cell' } }}>Units/Pallet</TableCell>
-							<TableCell align="right">Qty per Pallet</TableCell>
+							<TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Item ID</TableCell>
+							<TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Description</TableCell>
+							<TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
+								Expected Qty
+							</TableCell>
+							<TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" } }}>
+								Units/Pallet
+							</TableCell>
+							<TableCell align="right">Actual Qty/Pallet</TableCell>
 							<TableCell align="center">Confirmed</TableCell>
 							<TableCell align="center">Actions</TableCell>
 						</TableRow>
@@ -477,19 +512,29 @@ export default function Screen7() {
 										backgroundColor: row.confirmedPallets.length > 0 ? "rgba(76, 175, 80, 0.1)" : "white",
 									}}
 								>
-									<TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+									<TableCell
+										sx={{ display: { xs: "none", sm: "table-cell" }, fontSize: { xs: "0.875rem", sm: "1rem" } }}
+									>
 										{row.product.item_id}
 									</TableCell>
-									<TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+									<TableCell
+										sx={{ display: { xs: "none", md: "table-cell" }, fontSize: { xs: "0.875rem", sm: "1rem" } }}
+									>
 										{row.product.description}
 									</TableCell>
-									<TableCell align="right" sx={{ display: { xs: 'none', sm: 'table-cell' }, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+									<TableCell
+										align="right"
+										sx={{ display: { xs: "none", sm: "table-cell" }, fontSize: { xs: "0.875rem", sm: "1rem" } }}
+									>
 										{row.line.expected_qty}
 									</TableCell>
-									<TableCell align="right" sx={{ display: { xs: 'none', md: 'table-cell' }, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+									<TableCell
+										align="right"
+										sx={{ display: { xs: "none", md: "table-cell" }, fontSize: { xs: "0.875rem", sm: "1rem" } }}
+									>
 										{row.product.units_per_pallet}
 									</TableCell>
-									<TableCell align="right" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+									<TableCell align="right" sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
 										{row.confirmedPallets.length === 0 ? (
 											<TextField
 												type="number"
@@ -514,17 +559,18 @@ export default function Screen7() {
 									</TableCell>
 									<TableCell align="center">
 										<Box sx={{ display: "flex", gap: { xs: 0.5, sm: 1 }, justifyContent: "center", flexWrap: "wrap" }}>
-											{row.confirmedPallets.length === 0 ? (
+											{row.confirmedPallets.length < row.expectedPallets ? (
 												<>
 													<Button
-														size={isTablet ? 'small' : 'small'}
+														size={isTablet ? "small" : "small"}
 														variant="contained"
 														startIcon={<CheckCircleIcon size={16} />}
 														onClick={() => handleConfirmPallet(rowIndex)}
 														disabled={isSubmitting}
-														sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+														sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
+														title={`Confirm pallet ${row.confirmedPallets.length + 1}/${row.expectedPallets}`}
 													>
-														{isTablet ? 'OK' : 'Confirm'}
+														{isTablet ? "OK" : "Confirm"}
 													</Button>
 													{row.hasShipNowOption && (
 														<Button
@@ -546,10 +592,10 @@ export default function Screen7() {
 													variant="outlined"
 													color="error"
 													startIcon={<TrashIcon size={16} />}
-													onClick={() => handleUndoPallet(rowIndex, 0)}
+													onClick={() => handleUndoPallet(rowIndex, row.confirmedPallets.length - 1)}
 													disabled={isSubmitting}
 												>
-													Undo
+													Undo Last
 												</Button>
 											)}
 										</Box>
@@ -562,29 +608,35 @@ export default function Screen7() {
 			</TableContainer>
 
 			{/* Summary & Actions */}
-			<Box sx={{ 
-				display: "flex", 
-				justifyContent: "space-between", 
-				alignItems: { xs: 'flex-start', sm: 'center' },
-				flexDirection: { xs: 'column', sm: 'row' },
-				gap: { xs: 2, sm: 0 }
-			}}>
+			<Box
+				sx={{
+					display: "flex",
+					justifyContent: "space-between",
+					alignItems: { xs: "flex-start", sm: "center" },
+					flexDirection: { xs: "column", sm: "row" },
+					gap: { xs: 2, sm: 0 },
+				}}
+			>
 				<Box>
-					<Typography 
-						variant="body2" 
-						color="textSecondary"
-						sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-					>
-						Total Pallets Confirmed: <strong>{totalConfirmed}</strong>
+					<Typography variant="body2" color="textSecondary" sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
+						Total Pallets Confirmed:{" "}
+						<strong>
+							{totalConfirmed}/{totalExpected}
+						</strong>
 					</Typography>
+					{totalConfirmed < totalExpected && (
+						<Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.5 }}>
+							⚠️ Confirm all {totalExpected} pallets to finish
+						</Typography>
+					)}
 				</Box>
 				<Button
 					variant="contained"
 					color="success"
-					size={isTablet ? 'medium' : 'large'}
+					size={isTablet ? "medium" : "large"}
 					onClick={handleFinishTally}
 					disabled={!isFinishEnabled || isSubmitting}
-					sx={{ width: { xs: '100%', sm: 'auto' } }}
+					sx={{ width: { xs: "100%", sm: "auto" } }}
 				>
 					{isSubmitting ? <CircularProgress size={24} /> : "Finish Tally"}
 				</Button>

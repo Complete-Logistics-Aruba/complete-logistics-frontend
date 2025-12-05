@@ -19,33 +19,26 @@
  * @module components/core/ConfirmDialog
  */
 
-import React from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-} from '@mui/material';
+import React from "react";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 
 export interface ConfirmDialogProps {
-  /** Whether dialog is open */
-  open: boolean;
-  /** Dialog title */
-  title: string;
-  /** Dialog message */
-  message: string;
-  /** Callback when confirmed */
-  onConfirm: () => void;
-  /** Callback when cancelled */
-  onCancel: () => void;
-  /** Confirm button text */
-  confirmText?: string;
-  /** Cancel button text */
-  cancelText?: string;
-  /** Whether confirm button is loading */
-  loading?: boolean;
+	/** Whether dialog is open */
+	open: boolean;
+	/** Dialog title */
+	title: string;
+	/** Dialog message */
+	message: string;
+	/** Callback when confirmed */
+	onConfirm: () => void;
+	/** Callback when cancelled */
+	onCancel: () => void;
+	/** Confirm button text */
+	confirmText?: string;
+	/** Cancel button text */
+	cancelText?: string;
+	/** Whether confirm button is loading */
+	loading?: boolean;
 }
 
 /**
@@ -57,29 +50,29 @@ export interface ConfirmDialogProps {
  * @returns ConfirmDialog component
  */
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-  open,
-  title,
-  message,
-  onConfirm,
-  onCancel,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  loading = false,
+	open,
+	title,
+	message,
+	onConfirm,
+	onCancel,
+	confirmText = "Confirm",
+	cancelText = "Cancel",
+	loading = false,
 }) => (
-  <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
-    <DialogTitle>{title}</DialogTitle>
-    <DialogContent>
-      <DialogContentText>{message}</DialogContentText>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={onCancel} disabled={loading}>
-        {cancelText}
-      </Button>
-      <Button onClick={onConfirm} variant="contained" disabled={loading}>
-        {confirmText}
-      </Button>
-    </DialogActions>
-  </Dialog>
+	<Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
+		<DialogTitle>{title}</DialogTitle>
+		<DialogContent>
+			<DialogContentText>{message}</DialogContentText>
+		</DialogContent>
+		<DialogActions>
+			<Button onClick={onCancel} disabled={loading}>
+				{cancelText}
+			</Button>
+			<Button onClick={onConfirm} variant="contained" disabled={loading}>
+				{confirmText}
+			</Button>
+		</DialogActions>
+	</Dialog>
 );
 
-ConfirmDialog.displayName = 'ConfirmDialog';
+ConfirmDialog.displayName = "ConfirmDialog";

@@ -15,59 +15,124 @@ export interface DashboardConfig {
 	navItems: NavItemConfig[];
 }
 
-// Helper function to create nav items as a flat list (no groups) per approved structure
+// Helper function to create nav items per approved structure
+// Milestone 1: CSE (collapsible menus) + WH (flat menu) + Admin (both)
 const createNavItems = () => {
 	const items: NavItemConfig[] = [];
 
-	// 1. Dashboard
-	items.push({ key: "dashboard", title: "Dashboard", href: "/dashboard", icon: "house" });
+	// 1. Dashboard / Home (role-based label)
+	items.push(
+		{
+			key: "dashboard",
+			title: "Dashboard",
+			href: "/dashboard",
+			roles: ["Customer Service", "Admin"],
+		},
+		{
+			key: "home",
+			title: "Home",
+			href: "/warehouse/home",
+			roles: ["Warehouse"],
+		}
+	);
 
-	// 2. Screens (without Warehouse parent menu)
 	if (featureFlags.SHOW_WAREHOUSE) {
+		// ========================================
+		// CUSTOMER SERVICE ROLE (CSE)
+		// ========================================
+		// Collapsible "Inventory" menu for Product Master
+		// ========================================
+		// WAREHOUSE ROLE (WH)
+		// ========================================
+		// ========================================
+		// ADMIN & OPS MANAGER ROLE (SUPERUSER)
+		// ========================================
 		items.push(
 			{
-				key: "screen-0",
-				title: "Screen 0: Product Master",
-				href: paths.warehouseScreens.screen0,
-				icon: "file-csv",
-				roles: ["CSE"],
-			},
-			{
-				key: "screen-0b",
-				title: "Screen 0B: Product Maintenance",
-				href: paths.warehouseScreens.screen0b,
-				icon: "pencil",
-				roles: ["CSE"],
-			},
-			{
-				key: "screen-1",
-				title: "Screen 1: Receiving Order",
-				href: paths.warehouseScreens.screen1,
-				icon: "inbox",
-				roles: ["CSE"],
-			},
-			{
-				key: "screen-5",
-				title: "Screen 5: Pending Receipts",
-				href: paths.warehouseScreens.screen5,
-				icon: "list",
-				roles: ["WH"],
-			},
-			{
-				key: "screen-6",
-				title: "Screen 6: Container Photos",
-				href: paths.warehouseScreens.screen6,
-				icon: "camera",
-				roles: ["WH"],
-			},
-			{
-				key: "screen-7",
-				title: "Screen 7: Tally Pallets",
-				href: paths.warehouseScreens.screen7,
+				key: "inventory",
+				title: "Inventory",
 				icon: "package",
-				roles: ["WH"],
+				roles: ["Customer Service", "Admin"],
+				items: [
+					{
+						key: "screen-0",
+						title: "Product Master",
+						href: paths.warehouseScreens.screen0,
+						icon: "file-csv",
+					},
+					{
+						key: "screen-0b",
+						title: "Product Maintenance",
+						href: paths.warehouseScreens.screen0b,
+						icon: "pencil",
+					},
+				],
+			},
+			{
+				key: "inbound-cse",
+				title: "Inbound",
+				icon: "inbox",
+				roles: ["Customer Service", "Admin"],
+				items: [
+					{
+						key: "screen-1",
+						title: "Create Receiving Order",
+						href: paths.warehouseScreens.screen1,
+						icon: "plus",
+					},
+				],
+			},
+			{
+				key: "inbound-wh",
+				title: "Inbound",
+				icon: "inbox",
+				roles: ["Warehouse"],
+				items: [
+					{
+						key: "screen-5",
+						title: "Pending Receipts",
+						href: paths.warehouseScreens.screen5,
+						icon: "inbox",
+					},
+					{
+						key: "screen-6",
+						title: "Container Photos",
+						href: paths.warehouseScreens.screen6,
+						icon: "image",
+					},
+				],
+			},
+			{
+				key: "floor-operations",
+				title: "Floor Operations",
+				icon: "warehouse",
+				roles: ["Admin"],
+				items: [
+					{
+						key: "screen-5-admin",
+						title: "Pending Receipts",
+						href: paths.warehouseScreens.screen5,
+						icon: "inbox",
+					},
+					{
+						key: "screen-6-admin",
+						title: "Container Photos",
+						href: paths.warehouseScreens.screen6,
+						icon: "image",
+					},
+					{
+						key: "screen-7-admin",
+						title: "Tally Pallets",
+						href: paths.warehouseScreens.screen7,
+						icon: "package",
+					},
+				],
 			}
 		);
+
+		// Screen 6 and Screen 7 are hidden from sidebar
+		// They are only accessible through workflow navigation:
+		// Screen 5 → Screen 6 (Container Photos) → Screen 7 (Tally Pallets)
 	}
 
 	return items;

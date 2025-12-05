@@ -47,49 +47,55 @@ export const routes: RouteObject[] = [
 				),
 			},
 			{
-				path: "screen-0",
+				path: "home",
+				element: React.createElement(
+					React.lazy(() => import("@/pages/warehouse").then((module) => ({ default: module.Page })))
+				),
+			},
+			{
+				path: "product-master",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen0").then((module) => ({ default: module.Screen0 })))
 				),
 			},
 			{
-				path: "screen-0b",
+				path: "product-maintenance",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen0B").then((module) => ({ default: module.Screen0B })))
 				),
 			},
 			{
-				path: "screen-1",
+				path: "create-receiving-order",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen1").then((module) => ({ default: module.Screen1 })))
 				),
 			},
 			{
-				path: "screen-2",
+				path: "receiving-summary",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen2").then((module) => ({ default: module.default })))
 				),
 			},
 			{
-				path: "screen-4",
+				path: "register-empty-container",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen4").then((module) => ({ default: module.default })))
 				),
 			},
 			{
-				path: "screen-5",
+				path: "pending-receipts",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen5").then((module) => ({ default: module.default })))
 				),
 			},
 			{
-				path: "screen-6",
+				path: "container-photos",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen6").then((module) => ({ default: module.Screen6 })))
 				),
 			},
 			{
-				path: "screen-7",
+				path: "tally-pallets",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/screen7").then((module) => ({ default: module.default })))
 				),

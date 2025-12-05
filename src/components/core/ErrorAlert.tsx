@@ -13,14 +13,14 @@
  * @module components/core/ErrorAlert
  */
 
-import React from 'react';
-import { Alert, AlertProps } from '@mui/material';
+import React from "react";
+import { Alert, AlertProps } from "@mui/material";
 
-export interface ErrorAlertProps extends Omit<AlertProps, 'severity'> {
-  /** Error message to display */
-  message: string;
-  /** Callback when alert is closed */
-  onClose?: () => void;
+export interface ErrorAlertProps extends Omit<AlertProps, "severity"> {
+	/** Error message to display */
+	message: string;
+	/** Callback when alert is closed */
+	onClose?: () => void;
 }
 
 /**
@@ -32,9 +32,9 @@ export interface ErrorAlertProps extends Omit<AlertProps, 'severity'> {
  * @returns ErrorAlert component
  */
 export const ErrorAlert: React.FC<ErrorAlertProps> = ({ message, onClose, ...props }) => (
-  <Alert severity="error" onClose={onClose} {...props}>
-    {message}
-  </Alert>
+	<Alert severity="error" onClose={onClose} {...props}>
+		{message}
+	</Alert>
 );
 
-ErrorAlert.displayName = 'ErrorAlert';
+ErrorAlert.displayName = "ErrorAlert";

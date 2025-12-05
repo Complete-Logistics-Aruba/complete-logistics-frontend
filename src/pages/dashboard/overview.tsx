@@ -3,14 +3,10 @@ import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { PackageIcon } from "@phosphor-icons/react/dist/ssr/Package";
-import { ReceiptIcon } from "@phosphor-icons/react/dist/ssr/Receipt";
-import { TruckIcon } from "@phosphor-icons/react/dist/ssr/Truck";
 import { Helmet } from "react-helmet-async";
 
 import type { Metadata } from "@/types/metadata";
 import { appConfig } from "@/config/app";
-import { Summary } from "@/components/dashboard/overview/summary";
 
 const metadata = { title: appConfig.name } satisfies Metadata;
 
@@ -73,63 +69,16 @@ const updatePreviousFclCount = (count: number): void => {
 };
 
 export function Page(): React.JSX.Element {
-	// Set up state for FCL count and trend
-	const [fclCount, setFclCount] = React.useState<number>(0);
-	const [fclDiff, setFclDiff] = React.useState<number>(0);
-	const [fclTrend, setFclTrend] = React.useState<"up" | "down">("up");
-
-	// Calculate trend percentage based on current and previous counts
-	const calculateTrend = (currentCount: number, previousCount: number): void => {
-		if (previousCount === 0) {
-			// If there was no previous count, set a default trend
-			setFclDiff(0);
-			setFclTrend("up");
-		} else {
-			const diff = currentCount - previousCount;
-			const percentage = Math.abs((diff / previousCount) * 100);
-			setFclDiff(Math.round(percentage));
-			setFclTrend(diff >= 0 ? "up" : "down");
-		}
-	};
-
-	// Get the FCL count on component mount and whenever localStorage changes
+	// Get the FCL count on component mount
 	React.useEffect(() => {
 		// Get current count
 		const currentCount = getFclShipmentsCount();
-		setFclCount(currentCount);
-
-		// Get previous count and calculate trend
-		const previousCount = getPreviousFclCount();
-		calculateTrend(currentCount, previousCount);
 
 		// Update previous count for next calculation
 		setTimeout(() => {
 			updatePreviousFclCount(currentCount);
 		}, 1000);
-
-		// Set up event listener for storage changes
-		const handleStorageChange = () => {
-			const newCount = getFclShipmentsCount();
-			setFclCount(newCount);
-			calculateTrend(newCount, fclCount);
-		};
-
-		globalThis.addEventListener("storage", handleStorageChange);
-
-		// For local changes that don't trigger the storage event
-		const interval = setInterval(() => {
-			const newCount = getFclShipmentsCount();
-			if (newCount !== fclCount) {
-				setFclCount(newCount);
-				calculateTrend(newCount, fclCount);
-			}
-		}, 2000); // Check every 2 seconds
-
-		return () => {
-			globalThis.removeEventListener("storage", handleStorageChange);
-			clearInterval(interval);
-		};
-	}, [fclCount]);
+	}, []);
 	return (
 		<React.Fragment>
 			<Helmet>
@@ -156,30 +105,7 @@ export function Page(): React.JSX.Element {
 						</div>
 					</Stack>
 					<Grid container spacing={4}>
-						<Grid
-							size={{
-								md: 4,
-								xs: 12,
-							}}
-						>
-							<Summary amount={fclCount} diff={fclDiff} icon={TruckIcon} title="FCL Shipments" trend={fclTrend} />
-						</Grid>
-						<Grid
-							size={{
-								md: 4,
-								xs: 12,
-							}}
-						>
-							<Summary amount={24} diff={8} icon={PackageIcon} title="LCL Shipments" trend="up" />
-						</Grid>
-						<Grid
-							size={{
-								md: 4,
-								xs: 12,
-							}}
-						>
-							<Summary amount={18} diff={2} icon={ReceiptIcon} title="Invoices" trend="down" />
-						</Grid>
+						{/* Summary cards removed - use landing.tsx instead */}
 						{/* <Grid
 							size={{
 								md: 8,

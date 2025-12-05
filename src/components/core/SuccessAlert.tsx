@@ -13,14 +13,14 @@
  * @module components/core/SuccessAlert
  */
 
-import React from 'react';
-import { Alert, AlertProps } from '@mui/material';
+import React from "react";
+import { Alert, AlertProps } from "@mui/material";
 
-export interface SuccessAlertProps extends Omit<AlertProps, 'severity'> {
-  /** Success message to display */
-  message: string;
-  /** Callback when alert is closed */
-  onClose?: () => void;
+export interface SuccessAlertProps extends Omit<AlertProps, "severity"> {
+	/** Success message to display */
+	message: string;
+	/** Callback when alert is closed */
+	onClose?: () => void;
 }
 
 /**
@@ -32,9 +32,9 @@ export interface SuccessAlertProps extends Omit<AlertProps, 'severity'> {
  * @returns SuccessAlert component
  */
 export const SuccessAlert: React.FC<SuccessAlertProps> = ({ message, onClose, ...props }) => (
-  <Alert severity="success" onClose={onClose} {...props}>
-    {message}
-  </Alert>
+	<Alert severity="success" onClose={onClose} {...props}>
+		{message}
+	</Alert>
 );
 
-SuccessAlert.displayName = 'SuccessAlert';
+SuccessAlert.displayName = "SuccessAlert";

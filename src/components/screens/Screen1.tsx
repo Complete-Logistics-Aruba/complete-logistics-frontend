@@ -374,7 +374,8 @@ export function Screen1() {
 							<strong>Items:</strong> {csvData?.length}
 						</Typography>
 						<Alert severity="success">
-							Receiving order has been created successfully. The warehouse team will now process this order starting with container photos (Screen 5).
+							Receiving order has been created successfully. The warehouse team will now process this order starting
+							with container photos (Screen 5).
 						</Alert>
 					</Stack>
 				</DialogContent>

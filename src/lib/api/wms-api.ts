@@ -87,7 +87,7 @@ export const auth = {
 			return {
 				id: data.user.id,
 				email: data.user.email || "",
-				role: profile?.role || "WH",
+				role: profile?.role || "Warehouse",
 			};
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Login failed"));
@@ -129,7 +129,7 @@ export const auth = {
 			return {
 				id: data.user.id,
 				email: data.user.email || "",
-				role: profile?.role || "WH",
+				role: profile?.role || "Warehouse",
 			};
 		} catch (error) {
 			console.error("Failed to get current user:", error);

@@ -8,13 +8,13 @@
  */
 
 // Domain types
-export * from './domain';
+export * from "./domain";
 
 // API types
-export * from './api';
+export * from "./api";
 
 // Component prop types
-export * from './components';
+export * from "./components";
 
 // Form data types
-export * from './forms';
+export * from "./forms";

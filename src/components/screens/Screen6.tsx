@@ -65,7 +65,7 @@ export const Screen6: React.FC = () => {
 	const location = useLocation();
 	const locationState = location.state as LocationState | undefined;
 	const theme = useTheme();
-	const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+	const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
 	// State management - Orders List
 	const [orders, setOrders] = useState<ReceivingOrder[]>([]);
@@ -211,22 +211,22 @@ export const Screen6: React.FC = () => {
 					Back
 				</Button> */}
 
-				<Typography 
-					variant="h4" 
-					component="h1" 
-					gutterBottom 
-					sx={{ 
+				<Typography
+					variant="h4"
+					component="h1"
+					gutterBottom
+					sx={{
 						fontWeight: "bold",
-						fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+						fontSize: { xs: "1.5rem", sm: "2rem", md: "2.5rem" },
 					}}
 				>
 					📦 Container Photos
 				</Typography>
-				<Typography 
-					variant="body2" 
-					color="textSecondary" 
-					paragraph 
-					sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}
+				<Typography
+					variant="body2"
+					color="textSecondary"
+					paragraph
+					sx={{ mb: 3, fontSize: { xs: "0.875rem", sm: "1rem" } }}
 				>
 					Select a receiving order to capture container photos
 				</Typography>
@@ -290,6 +290,15 @@ export const Screen6: React.FC = () => {
 
 										<Box sx={{ mb: 2 }}>
 											<Typography variant="caption" color="textSecondary">
+												Container Number
+											</Typography>
+											<Typography variant="body2" sx={{ fontWeight: "bold" }}>
+												{order.container_num}
+											</Typography>
+										</Box>
+
+										<Box sx={{ mb: 2 }}>
+											<Typography variant="caption" color="textSecondary">
 												Seal Number
 											</Typography>
 											<Typography variant="body2" sx={{ fontWeight: "bold" }}>
@@ -328,43 +337,54 @@ export const Screen6: React.FC = () => {
 	// If order selected or coming from Screen 1, show photo upload interface
 	return (
 		<Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2, md: 3 }, px: { xs: 1, sm: 2, md: 3 } }}>
-			<Typography 
-				variant="h4" 
-				component="h1" 
-				sx={{ 
-					fontWeight: "bold", 
+			<Typography
+				variant="h4"
+				component="h1"
+				sx={{
+					fontWeight: "bold",
 					mb: 1,
-					fontSize: { xs: '1.25rem', sm: '1.75rem', md: '2.25rem', lg: '2.5rem' }
+					fontSize: { xs: "1.25rem", sm: "1.75rem", md: "2.25rem", lg: "2.5rem" },
 				}}
 			>
 				Container Photos
 			</Typography>
-			<Typography 
-				variant="body2" 
-				color="textSecondary" 
-				sx={{ mb: 2, fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' } }}
-			>
-				Container: <strong>{containerNum}</strong>
-			</Typography>
+			<Box sx={{ display: "flex", gap: 3, mb: 2, flexWrap: "wrap" }}>
+				<Typography
+					variant="body2"
+					color="textSecondary"
+					sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" } }}
+				>
+					Container: <strong>{containerNum}</strong>
+				</Typography>
+				<Typography
+					variant="body2"
+					color="textSecondary"
+					sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" } }}
+				>
+					Seal: <strong>{sealNum}</strong>
+				</Typography>
+			</Box>
 
 			<Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2, md: 3, lg: 4 }, mb: 3, backgroundColor: "#f9f9f9" }}>
 				{/* Header with title and progress badge */}
-				<Box sx={{ 
-					display: "flex", 
-					justifyContent: "space-between", 
-					alignItems: { xs: 'flex-start', sm: 'center' },
-					flexDirection: { xs: 'column', sm: 'row' },
-					gap: { xs: 2, sm: 0 },
-					mb: 3 
-				}}>
-					<Typography 
-						variant="h6" 
-						sx={{ 
-							fontWeight: "bold", 
-							display: "flex", 
-							alignItems: "center", 
+				<Box
+					sx={{
+						display: "flex",
+						justifyContent: "space-between",
+						alignItems: { xs: "flex-start", sm: "center" },
+						flexDirection: { xs: "column", sm: "row" },
+						gap: { xs: 2, sm: 0 },
+						mb: 3,
+					}}
+				>
+					<Typography
+						variant="h6"
+						sx={{
+							fontWeight: "bold",
+							display: "flex",
+							alignItems: "center",
 							gap: 1,
-							fontSize: { xs: '1rem', sm: '1.25rem' }
+							fontSize: { xs: "1rem", sm: "1.25rem" },
 						}}
 					>
 						<CameraIcon size={24} />
@@ -500,14 +520,16 @@ export const Screen6: React.FC = () => {
 			</Paper>
 
 			{/* Action buttons */}
-			<Box sx={{ 
-				display: "grid", 
-				gridTemplateColumns: { xs: "1fr", sm: "1fr 1.5fr" },
-				gap: { xs: 1.5, sm: 2 }
-			}}>
+			<Box
+				sx={{
+					display: "grid",
+					gridTemplateColumns: { xs: "1fr", sm: "1fr 1.5fr" },
+					gap: { xs: 1.5, sm: 2 },
+				}}
+			>
 				<Button
 					variant="outlined"
-					size={isTablet ? 'medium' : 'large'}
+					size={isTablet ? "medium" : "large"}
 					onClick={selectedOrder ? handleBackToOrdersList : () => navigate(-1)}
 					sx={{ py: { xs: 1, sm: 1.5 } }}
 				>
@@ -515,7 +537,7 @@ export const Screen6: React.FC = () => {
 				</Button>
 				<Button
 					variant="contained"
-					size={isTablet ? 'medium' : 'large'}
+					size={isTablet ? "medium" : "large"}
 					onClick={handleSubmit}
 					disabled={isSubmitting || !allPhotosUploaded}
 					startIcon={isSubmitting ? <CircularProgress size={20} /> : undefined}

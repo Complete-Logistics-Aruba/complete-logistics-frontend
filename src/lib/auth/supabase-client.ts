@@ -8,7 +8,7 @@
  * @module lib/auth/supabaseClient
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * Initialize Supabase client
@@ -22,10 +22,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. ' +
-    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env file'
-  );
+	throw new Error(
+		"Missing Supabase environment variables. " + "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env file"
+	);
 }
 
 /**
@@ -44,10 +43,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * @returns {Promise<Session | null>} Current session or null if not authenticated
  */
 export async function getCurrentSession() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session;
+	const {
+		data: { session },
+	} = await supabase.auth.getSession();
+	return session;
 }
 
 /**
@@ -56,8 +55,8 @@ export async function getCurrentSession() {
  * @returns {Promise<User | null>} Current user or null if not authenticated
  */
 export async function getCurrentUser() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	return user;
 }

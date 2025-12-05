@@ -7,5 +7,5 @@
  * @module lib/api
  */
 
-export { default as wmsApi } from './wms-api';
-export { auth, products, receivingOrders, pallets, shippingOrders, locations, storage, email } from './wms-api';
+export { default as wmsApi } from "./wms-api";
+export { auth, products, receivingOrders, pallets, shippingOrders, locations, storage, email } from "./wms-api";

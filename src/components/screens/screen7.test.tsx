@@ -167,7 +167,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		});
 	});
 
-	it("should enable Finish Tally button only when pallets confirmed", async () => {
+	it("should enable Finish Tally button only when ALL expected pallets are confirmed", async () => {
 		const mockOrder = {
 			id: "order-1",
 			container_num: "CONT-001",
@@ -177,16 +177,42 @@ describe("Screen 7 - Pallet Tallying", () => {
 			created_by: "user-1",
 		};
 
+		const mockLines = [
+			{
+				id: "line-1",
+				receiving_order_id: "order-1",
+				item_id: "ITEM-001",
+				expected_qty: 1000,
+				created_at: "2025-11-26T00:00:00Z",
+			},
+		];
+
+		const mockProduct = {
+			id: "prod-1",
+			item_id: "ITEM-001",
+			description: "Test Product",
+			units_per_pallet: 500,
+			pallet_positions: 1,
+			active: true,
+		};
+
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
-		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
+		(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
 		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([]);
 
 		renderScreen7();
 
+		// Button should be disabled when no pallets confirmed (expected: 2, confirmed: 0)
 		await waitFor(() => {
 			const finishButton = screen.getByText("Finish Tally");
 			expect(finishButton).toBeDisabled();
+		});
+
+		// Warning message should show requirement
+		await waitFor(() => {
+			expect(screen.getByText(/Confirm all 2 pallets to finish/)).toBeInTheDocument();
 		});
 	});
 
@@ -212,7 +238,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 			expect(screen.getByText("Description")).toBeInTheDocument();
 			expect(screen.getByText("Expected Qty")).toBeInTheDocument();
 			expect(screen.getByText("Units/Pallet")).toBeInTheDocument();
-			expect(screen.getByText("Qty per Pallet")).toBeInTheDocument();
+			expect(screen.getByText("Actual Qty/Pallet")).toBeInTheDocument();
 			expect(screen.getByText("Confirmed")).toBeInTheDocument();
 			expect(screen.getByText("Actions")).toBeInTheDocument();
 		});

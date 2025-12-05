@@ -20,13 +20,13 @@
  * @module components/core/FormField
  */
 
-import React from 'react';
-import { TextField } from '@mui/material';
-import type { TextFieldProps } from '@mui/material';
+import React from "react";
+import { TextField } from "@mui/material";
+import type { TextFieldProps } from "@mui/material";
 
-export interface FormFieldProps extends Omit<TextFieldProps, 'size'> {
-  /** Loading state */
-  loading?: boolean;
+export interface FormFieldProps extends Omit<TextFieldProps, "size"> {
+	/** Loading state */
+	loading?: boolean;
 }
 
 /**
@@ -38,16 +38,8 @@ export interface FormFieldProps extends Omit<TextFieldProps, 'size'> {
  * @param props - TextField props plus custom props
  * @returns FormField component
  */
-export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ loading = false, ...props }, ref) => (
-    <TextField
-      ref={ref}
-      fullWidth
-      size="small"
-      disabled={loading || props.disabled}
-      {...props}
-    />
-  )
-);
+export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(({ loading = false, ...props }, ref) => (
+	<TextField ref={ref} fullWidth size="small" disabled={loading || props.disabled} {...props} />
+));
 
-FormField.displayName = 'FormField';
+FormField.displayName = "FormField";
