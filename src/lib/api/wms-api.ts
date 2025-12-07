@@ -863,36 +863,41 @@ export const locations = {
 	 *
 	 * This function translates user-selected warehouse coordinates (rack, level, position)
 	 * into a valid location database record. It handles both regular rack locations and
-	 * the special aisle location.
+	 * the specific aisle zones (W1-AISLE-01 through W1-AISLE-04).
 	 *
 	 * **Location Structure:**
 	 * - Racks: 1-8
 	 * - Levels: 1-4
 	 * - Positions: A-T (20 positions per level)
-	 * - Aisle: Special location code 'AISLE' (always valid)
+	 * - Aisle Zones: W1-AISLE-01, W1-AISLE-02, W1-AISLE-03, W1-AISLE-04
 	 *
 	 * **Usage Examples:**
 	 * ```typescript
 	 * // Resolve regular rack location
 	 * const location = await wmsApi.locations.resolve('warehouse-1', 5, 2, 'G');
-	 * // Returns: { id: 'loc-123', code: 'W1-A-5-2', warehouse_id: 'warehouse-1', ... }
+	 * // Returns: { id: 'loc-123', code: 'W1-05-02-G', warehouse_id: 'warehouse-1', ... }
 	 *
-	 * // Resolve aisle location
+	 * // Resolve aisle zone location (zone 1-4)
 	 * const aisleLocation = await wmsApi.locations.resolve('warehouse-1', 'AISLE', 1, 'A');
-	 * // Returns: { id: 'loc-aisle', code: 'W1-AISLE', warehouse_id: 'warehouse-1', ... }
+	 * // Returns: { id: 'loc-aisle-01', code: 'W1-AISLE-01', warehouse_id: 'warehouse-1', ... }
 	 * ```
 	 *
 	 * @param warehouse_id - Warehouse UUID (e.g., from warehouses.getDefault())
-	 * @param rack - Rack number (1-8) or 'AISLE' for aisle location
-	 * @param level - Level number (1-4), ignored for aisle locations
+	 * @param rack - Rack number (1-8) or 'AISLE' for aisle zone location
+	 * @param level - Level number (1-4), or aisle zone number (1-4) if rack='AISLE'
 	 * @param position - Position letter (A-T), ignored for aisle locations
 	 * @returns Location object with id, code, warehouse_id, and other metadata
 	 * @throws Error if location not found or database error occurs
 	 *
 	 * @example
 	 * try {
+	 *   // Regular rack location
 	 *   const location = await wmsApi.locations.resolve(warehouseId, 3, 1, 'M');
-	 *   console.log(`Resolved to location: ${location.code}`);
+	 *   console.log(`Resolved to location: ${location.code}`); // W1-03-01-M
+	 *
+	 *   // Aisle zone location (zone 2)
+	 *   const aisleLocation = await wmsApi.locations.resolve(warehouseId, 'AISLE', 2, 'A');
+	 *   console.log(`Resolved to aisle: ${aisleLocation.code}`); // W1-AISLE-02
 	 * } catch (error) {
 	 *   console.error('Location not found:', error.message);
 	 * }
@@ -901,10 +906,16 @@ export const locations = {
 		try {
 			let query = supabase.from("locations").select("*").eq("warehouse_id", warehouse_id);
 
-			query =
-				rack === "AISLE"
-					? query.eq("code", `${warehouse_id}-AISLE`)
-					: query.eq("rack", rack).eq("level", level).eq("position", position);
+			if (rack === "AISLE") {
+				// Aisle zone: level parameter is the zone number (1-4)
+				const zoneNum = String(level).padStart(2, "0");
+				query = query.eq("code", `W1-AISLE-${zoneNum}`);
+			} else {
+				// Regular rack location
+				const rackNum = String(rack).padStart(2, "0");
+				const levelNum = String(level).padStart(2, "0");
+				query = query.eq("code", `W1-${rackNum}-${levelNum}-${position}`);
+			}
 
 			const { data, error } = await query.single();
 
@@ -926,13 +937,21 @@ export const locations = {
 
 /**
  * Storage Operations
+ *
+ * Uses 3 separate buckets for security:
+ * - "receiving" - Receiving order CSVs and container photos
+ * - "shipping" - Shipping order CSVs and shipping documents
+ * - "manifests" - Manifest documents and hand delivery forms
+ *
+ * Do NOT use folder prefixes like "receiving/" inside bucket names.
+ * The bucket name itself determines the storage location.
  */
 export const storage = {
 	/**
 	 * Upload file to Supabase Storage
 	 *
-	 * @param bucket - Storage bucket name
-	 * @param path - File path in bucket
+	 * @param bucket - Storage bucket name ("receiving", "shipping", or "manifests")
+	 * @param path - File path in bucket (e.g., "order-123/photo_1.jpg")
 	 * @param file - File to upload
 	 * @returns Public URL of uploaded file
 	 * @throws Error with user-friendly message
@@ -1029,7 +1048,7 @@ export const storage = {
 	async getReceivingOrderCSV(receivingOrderId: string): Promise<string> {
 		try {
 			// List files in the receiving order directory
-			const { data, error: listError } = await supabase.storage.from("uploads").list(`receiving/${receivingOrderId}`);
+			const { data, error: listError } = await supabase.storage.from("receiving").list(receivingOrderId);
 
 			if (listError) {
 				throw listError;
@@ -1047,9 +1066,7 @@ export const storage = {
 			}
 
 			// Get public URL
-			const { data: urlData } = supabase.storage
-				.from("uploads")
-				.getPublicUrl(`receiving/${receivingOrderId}/${csvFile.name}`);
+			const { data: urlData } = supabase.storage.from("receiving").getPublicUrl(`${receivingOrderId}/${csvFile.name}`);
 
 			return urlData.publicUrl;
 		} catch (error) {

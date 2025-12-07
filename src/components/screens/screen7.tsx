@@ -328,11 +328,9 @@ export default function Screen7() {
 		const totalExpected = rows.reduce((sum, row) => sum + row.expectedPallets, 0);
 		const totalConfirmed = rows.reduce((sum, row) => sum + row.confirmedPallets.length, 0);
 
-		if (totalConfirmed < totalExpected) {
-			enqueueSnackbar(
-				`Confirm all ${totalExpected} pallets before finishing. Currently confirmed: ${totalConfirmed}/${totalExpected}`,
-				{ variant: "warning" }
-			);
+		// Allow finishing with at least 1 pallet confirmed (partial completion allowed)
+		if (totalConfirmed === 0 || totalExpected === 0) {
+			enqueueSnackbar(`Please confirm at least 1 pallet before finishing`, { variant: "warning" });
 			return;
 		}
 
@@ -405,7 +403,7 @@ export default function Screen7() {
 
 	const totalExpected = rows.reduce((sum, row) => sum + row.expectedPallets, 0);
 	const totalConfirmed = rows.reduce((sum, row) => sum + row.confirmedPallets.length, 0);
-	const isFinishEnabled = totalConfirmed === totalExpected && totalExpected > 0;
+	const isFinishEnabled = totalConfirmed > 0 && totalExpected > 0;
 
 	return (
 		<Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
@@ -625,8 +623,8 @@ export default function Screen7() {
 						</strong>
 					</Typography>
 					{totalConfirmed < totalExpected && (
-						<Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.5 }}>
-							⚠️ Confirm all {totalExpected} pallets to finish
+						<Typography variant="caption" color="info.main" sx={{ display: "block", mt: 0.5 }}>
+							ℹ️ {totalExpected - totalConfirmed} pallets remaining
 						</Typography>
 					)}
 				</Box>

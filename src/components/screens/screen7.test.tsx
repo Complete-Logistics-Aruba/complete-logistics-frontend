@@ -167,7 +167,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		});
 	});
 
-	it("should enable Finish Tally button only when ALL expected pallets are confirmed", async () => {
+	it("should enable Finish Tally button only when at least 1 pallet is confirmed", async () => {
 		const mockOrder = {
 			id: "order-1",
 			container_num: "CONT-001",
@@ -210,9 +210,9 @@ describe("Screen 7 - Pallet Tallying", () => {
 			expect(finishButton).toBeDisabled();
 		});
 
-		// Warning message should show requirement
+		// Info message should show remaining pallets
 		await waitFor(() => {
-			expect(screen.getByText(/Confirm all 2 pallets to finish/)).toBeInTheDocument();
+			expect(screen.getByText(/2 pallets remaining/)).toBeInTheDocument();
 		});
 	});
 

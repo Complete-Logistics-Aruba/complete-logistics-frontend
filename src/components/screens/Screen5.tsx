@@ -21,6 +21,7 @@ import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 
 import { receivingOrderLines, receivingOrders } from "../../lib/api/wms-api";
+import { paths } from "../../paths";
 
 interface PendingReceipt {
 	id: string;
@@ -88,7 +89,7 @@ export default function Screen5() {
 			setReceipts((prev) => prev.map((r) => (r.id === receipt.id ? { ...r, status: "Unloading" } : r)));
 
 			// Navigate to Screen 6
-			navigate("/warehouse/screen-6", {
+			navigate(paths.warehouseScreens.screen6, {
 				state: {
 					receivingOrderId: receipt.id,
 					containerNum: receipt.container_num,

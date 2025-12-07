@@ -27,6 +27,7 @@ import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import type { ReceivingOrder } from "@/types/domain";
+import { paths } from "@/paths";
 import { wmsApi } from "@/lib/api";
 import { PhotoCapture } from "@/components/core";
 
@@ -183,7 +184,7 @@ export const Screen6: React.FC = () => {
 
 			// Navigate to Screen 7 (Pallet Tallying)
 			setTimeout(() => {
-				navigate("/warehouse/screen-7", {
+				navigate(paths.warehouseScreens.screen7, {
 					state: {
 						receivingOrderId,
 						containerNum,
