@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
 
 interface ProtectedRouteProps {
 	children: ReactNode;
-	requiredRole?: "CSE" | "WH" | "Admin";
+	requiredRole?: "Customer Service" | "Warehouse" | "Admin";
 }
 
 /**

@@ -49,7 +49,7 @@ import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { RocketIcon } from "@phosphor-icons/react/dist/ssr/Rocket";
 import { TrashIcon } from "@phosphor-icons/react/dist/ssr/Trash";
 import { useSnackbar } from "notistack";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import {
 	getShipNowOrder,
@@ -59,7 +59,6 @@ import {
 	receivingOrders,
 	shippingOrders as shippingOrdersApi,
 } from "../../lib/api/wms-api";
-import { useAuth } from "../../lib/auth/auth-context";
 import {
 	Pallet,
 	Product,
@@ -86,9 +85,7 @@ interface ShippingOrderWithLines extends ShippingOrder {
 
 export default function Screen7() {
 	const location = useLocation();
-	const navigate = useNavigate();
 	const { enqueueSnackbar } = useSnackbar();
-	const { user } = useAuth();
 	const theme = useTheme();
 	const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
@@ -106,7 +103,6 @@ export default function Screen7() {
 		const loadData = async () => {
 			if (!receivingOrderId) {
 				enqueueSnackbar("No receiving order selected", { variant: "error" });
-				navigate("/warehouse");
 				return;
 			}
 
@@ -191,7 +187,7 @@ export default function Screen7() {
 		};
 
 		loadData();
-	}, [receivingOrderId, navigate, enqueueSnackbar]);
+	}, [receivingOrderId, enqueueSnackbar]);
 
 	// Handle qty change
 	const handleQtyChange = (lineId: string, value: number) => {
@@ -342,40 +338,10 @@ export default function Screen7() {
 				status: "Staged",
 			});
 
-			// Role-based navigation
-			if (user?.role === "Warehouse") {
-				// Warehouse User: Show toast and navigate to Screen 5 (Pending Receipts)
-				enqueueSnackbar("✅ Pallets tallied successfully! Awaiting Customer Service review.", {
-					variant: "success",
-				});
-
-				setTimeout(() => {
-					navigate("/warehouse/screen-5");
-				}, 1500);
-			} else if (user?.role === "Customer Service") {
-				// Customer Service User: Navigate to Screen 2 (Receiving Summary)
-				enqueueSnackbar("✅ Tally finished! Order status set to Staged", {
-					variant: "success",
-				});
-
-				setTimeout(() => {
-					navigate("/warehouse/screen-2", {
-						state: {
-							receivingOrderId,
-							containerNum,
-							sealNum,
-						},
-					});
-				}, 1500);
-			} else {
-				// Unknown role
-				enqueueSnackbar("✅ Tally finished! Order status set to Staged", {
-					variant: "success",
-				});
-				setTimeout(() => {
-					navigate("/warehouse");
-				}, 1500);
-			}
+			// Show validation success message (no navigation for now)
+			enqueueSnackbar(`✅ Tally finished! ${totalConfirmed} pallets confirmed. Status set to Staged.`, {
+				variant: "success",
+			});
 		} catch (error) {
 			console.error("Error finishing tally:", error);
 			const message = error instanceof Error ? error.message : "Failed to finish tally";
@@ -409,7 +375,7 @@ export default function Screen7() {
 		<Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
 			{/* Header */}
 			<Box sx={{ display: "flex", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
-				<Button startIcon={<ArrowLeftIcon size={20} />} onClick={() => navigate(-1)} sx={{ mr: 2 }}>
+				<Button startIcon={<ArrowLeftIcon size={20} />} disabled sx={{ mr: 2 }}>
 					Back
 				</Button>
 				<Typography
