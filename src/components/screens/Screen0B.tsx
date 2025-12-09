@@ -40,6 +40,7 @@ import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 
 import { Product } from "@/types/domain";
+import { paths } from "@/paths";
 import { wmsApi } from "@/lib/api";
 
 /**
@@ -216,13 +217,13 @@ export function Screen0B() {
 								Screen 0B: Product Master Maintenance
 							</Typography>
 							<Typography variant="body1" color="textSecondary">
-								View, edit, add, and deactivate products
+								View, edit, add, and manage products in the master catalog
 							</Typography>
 						</Box>
 						<Button
 							variant="outlined"
 							startIcon={<ArrowLeftIcon size={20} />}
-							onClick={() => navigate("/warehouse/screen-0")}
+							onClick={() => navigate(paths.warehouseScreens.screen0)}
 							sx={{ textTransform: "none" }}
 						>
 							Back

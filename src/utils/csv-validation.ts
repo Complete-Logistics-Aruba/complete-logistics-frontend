@@ -19,7 +19,12 @@ export interface CSVError {
 }
 
 /**
- * Parse CSV file content
+ * Parse CSV file content with proper quoted field handling
+ *
+ * Handles:
+ * - Quoted fields with commas inside (e.g., "Brush, Nylon")
+ * - Escaped quotes inside quoted fields (e.g., "Quote: ""Hello""")
+ * - Empty fields
  *
  * @param content - CSV file content as string
  * @returns Array of parsed rows
@@ -30,11 +35,35 @@ export function parseCSV(content: string): Record<string, string>[] {
 		throw new Error("CSV must contain header and at least one data row");
 	}
 
-	const headers = lines[0].split(",").map((h) => h.trim());
-	const rows: Record<string, string>[] = [];
+	// Parse header row
+	const headers = parseCSVLine(lines[0]);
 
-	for (let i = 1; i < lines.length; i++) {
-		const values = lines[i].split(",").map((v) => v.trim());
+	// Parse data rows
+	const rows: Record<string, string>[] = [];
+	let currentLineIndex = 1;
+
+	while (currentLineIndex < lines.length) {
+		const line = lines[currentLineIndex];
+		if (line.trim() === "") {
+			currentLineIndex++;
+			continue; // Skip empty lines
+		}
+
+		// Handle multi-line quoted fields
+		let fullLine = line;
+		while (fullLine.endsWith('"') === false && fullLine.includes('"') && currentLineIndex + 1 < lines.length) {
+			// Check if we're in the middle of a quoted field
+			const quoteCount = (fullLine.match(/"/g) || []).length;
+			if (quoteCount % 2 === 1) {
+				// Odd number of quotes means we're in a quoted field
+				currentLineIndex++;
+				fullLine += "\n" + lines[currentLineIndex];
+			} else {
+				break;
+			}
+		}
+
+		const values = parseCSVLine(fullLine);
 		const row: Record<string, string> = {};
 
 		for (const [index, header] of headers.entries()) {
@@ -42,9 +71,49 @@ export function parseCSV(content: string): Record<string, string>[] {
 		}
 
 		rows.push(row);
+		currentLineIndex++;
 	}
 
 	return rows;
+}
+
+/**
+ * Parse a single CSV line respecting quoted fields
+ *
+ * @param line - CSV line to parse
+ * @returns Array of field values
+ */
+function parseCSVLine(line: string): string[] {
+	const fields: string[] = [];
+	let currentField = "";
+	let insideQuotes = false;
+
+	for (let i = 0; i < line.length; i++) {
+		const char = line[i];
+		const nextChar = line[i + 1];
+
+		if (char === '"') {
+			if (insideQuotes && nextChar === '"') {
+				// Escaped quote
+				currentField += '"';
+				i++; // Skip next quote
+			} else {
+				// Toggle quote state
+				insideQuotes = !insideQuotes;
+			}
+		} else if (char === "," && !insideQuotes) {
+			// Field separator
+			fields.push(currentField.trim());
+			currentField = "";
+		} else {
+			currentField += char;
+		}
+	}
+
+	// Add last field
+	fields.push(currentField.trim());
+
+	return fields;
 }
 
 /**

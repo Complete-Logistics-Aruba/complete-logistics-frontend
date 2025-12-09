@@ -6,7 +6,6 @@ import Divider from "@mui/material/Divider";
 import MenuItem from "@mui/material/MenuItem";
 import Popover from "@mui/material/Popover";
 import Typography from "@mui/material/Typography";
-import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/lib/auth/auth-context";
 import { toast } from "@/components/core/toaster";
@@ -15,13 +14,12 @@ import { toast } from "@/components/core/toaster";
 
 function SignOutButton(): React.JSX.Element {
 	const { logout } = useAuth();
-	const navigate = useNavigate();
 
 	const handleSignOut = async () => {
 		try {
 			await logout();
+			// logout() handles navigation to /auth/login, so no need to navigate here
 			toast.success("Signed out.");
-			navigate("/auth/login");
 		} catch (error) {
 			console.error("Sign out error:", error);
 			toast.error("Failed to sign out.");

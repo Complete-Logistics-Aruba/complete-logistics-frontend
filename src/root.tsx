@@ -8,6 +8,7 @@ import "@/styles/global.css";
 import type { Metadata } from "@/types/metadata";
 import { appConfig } from "@/config/app";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { setupPageVisibilityListener } from "@/lib/auth/supabase-client";
 import { getSettings as getPersistedSettings } from "@/lib/settings";
 import { Analytics } from "@/components/core/analytics";
 import { EnvIndicator } from "@/components/core/env-indicator";
@@ -29,6 +30,12 @@ export interface RootProps {
 
 export function Root({ children }: RootProps): React.JSX.Element {
 	const settings = getPersistedSettings();
+
+	// Setup page visibility listener to handle tab switches
+	React.useEffect(() => {
+		const unsubscribe = setupPageVisibilityListener();
+		return unsubscribe;
+	}, []);
 
 	return (
 		<HelmetProvider>

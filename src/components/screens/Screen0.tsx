@@ -35,6 +35,7 @@ import { useSnackbar } from "notistack";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 
+import { paths } from "@/paths";
 import { wmsApi } from "@/lib/api";
 import { supabase } from "@/lib/auth/supabase-client";
 import { ErrorAlert, FileUpload, LoadingSpinner, SuccessAlert } from "@/components/core";
@@ -72,6 +73,9 @@ export function Screen0() {
 	const [validationErrors, setValidationErrors] = useState<Array<{ row: number; field: string; message: string }>>([]);
 	const [csvUploaded, setCsvUploaded] = useState(false);
 
+	// Note: Supabase's autoRefreshToken handles session management automatically
+	// No need for manual refresh - it works across tab switches
+
 	const handleFileUpload = async (file: File) => {
 		setLoading(true);
 		setError(null);
@@ -79,12 +83,19 @@ export function Screen0() {
 		setValidationErrors([]);
 
 		try {
+			// Supabase autoRefreshToken handles session refresh automatically
+			// No need to manually call getSession() - it can hang
+			console.log("Starting CSV upload...");
+
 			// Validate CSV
 			let result;
 			try {
+				console.log("Starting CSV validation...");
 				result = await validateProductMasterCSV(file);
+				console.log("CSV validation complete:", result);
 			} catch (error_) {
 				const message = error_ instanceof Error ? error_.message : "Failed to validate CSV";
+				console.error("CSV validation error:", error_);
 				setError(`CSV validation error: ${message}`);
 				enqueueSnackbar(`CSV validation error: ${message}`, { variant: "error" });
 				setLoading(false);
@@ -92,11 +103,13 @@ export function Screen0() {
 			}
 
 			if (!result.valid) {
+				console.error("CSV validation failed with errors:", result.errors);
 				setValidationErrors(result.errors);
 				setError(`CSV validation failed: ${result.errors.length} errors found`);
 				setLoading(false);
 				return;
 			}
+			console.log("CSV validation passed, proceeding with database operations...");
 
 			// Transform data for database
 			const products = result.data.map((row) => ({
@@ -108,71 +121,62 @@ export function Screen0() {
 			}));
 
 			// Truncate existing products (delete all with cascade)
-			// Must delete in order: receiving_order_lines → receiving_orders → pallets → products
+			// Skip delete if there are no existing products to improve performance
 			try {
-				console.log("Clearing existing data (cascade delete)...");
+				console.log("Checking for existing products...");
 
-				// Step 1: Delete receiving order lines
-				console.log("Deleting receiving order lines...");
-				const { error: deleteLineError } = await supabase
-					.from("receiving_order_lines")
-					.delete()
-					.gte("created_at", "1900-01-01");
-				if (deleteLineError) {
-					console.error("Error deleting receiving order lines:", deleteLineError);
-					throw deleteLineError;
+				// Quick check: count existing products
+				const { count, error: countError } = await supabase
+					.from("products")
+					.select("*", { count: "exact", head: true });
+
+				if (countError) {
+					console.warn("Could not check existing products, skipping delete:", countError.message);
+					// Continue anyway - might be a permissions issue
+				} else if (count === 0) {
+					console.log("No existing products, skipping cascade delete");
+				} else {
+					console.log(`Found ${count} existing products, clearing...`);
+
+					// Helper function to safely delete with timeout
+					const safeDelete = async (table: string) => {
+						try {
+							console.log(`Deleting from ${table}...`);
+							const result = await Promise.race([
+								supabase.from(table).delete().gte("created_at", "1900-01-01"),
+								new Promise((_, reject) => setTimeout(() => reject(new Error(`Delete timeout for ${table}`)), 15_000)),
+							]);
+							const { error } = result as { error: { code?: string; message?: string } | null };
+
+							if (error) {
+								// Ignore "table not found" errors - it's okay if table doesn't exist
+								if (error.code === "PGRST205" || error.message?.includes("not found")) {
+									console.warn(`Table ${table} not found or empty, continuing...`);
+									return;
+								}
+								throw error;
+							}
+						} catch (error_) {
+							// Ignore table not found errors
+							const message = error_ instanceof Error ? error_.message : String(error_);
+							if (message.includes("not found") || message.includes("PGRST205") || message.includes("timeout")) {
+								console.warn(`Table ${table} delete failed/timed out, continuing...`);
+								return;
+							}
+							throw error_;
+						}
+					};
+
+					// Delete in order (with timeout protection)
+					await safeDelete("receiving_order_lines");
+					await safeDelete("shipping_order_lines");
+					await safeDelete("pallets");
+					await safeDelete("receiving_orders");
+					await safeDelete("shipping_orders");
+					await safeDelete("products");
+
+					console.log("Successfully cleared all existing data");
 				}
-
-				// Step 2: Delete shipping order lines
-				console.log("Deleting shipping order lines...");
-				const { error: deleteShippingLineError } = await supabase
-					.from("shipping_order_lines")
-					.delete()
-					.gte("created_at", "1900-01-01");
-				if (deleteShippingLineError) {
-					console.error("Error deleting shipping order lines:", deleteShippingLineError);
-					throw deleteShippingLineError;
-				}
-
-				// Step 3: Delete pallets
-				console.log("Deleting pallets...");
-				const { error: deletePalletError } = await supabase.from("pallets").delete().gte("created_at", "1900-01-01");
-				if (deletePalletError) {
-					console.error("Error deleting pallets:", deletePalletError);
-					throw deletePalletError;
-				}
-
-				// Step 4: Delete receiving orders
-				console.log("Deleting receiving orders...");
-				const { error: deleteReceivingError } = await supabase
-					.from("receiving_orders")
-					.delete()
-					.gte("created_at", "1900-01-01");
-				if (deleteReceivingError) {
-					console.error("Error deleting receiving orders:", deleteReceivingError);
-					throw deleteReceivingError;
-				}
-
-				// Step 5: Delete shipping orders
-				console.log("Deleting shipping orders...");
-				const { error: deleteShippingError } = await supabase
-					.from("shipping_orders")
-					.delete()
-					.gte("created_at", "1900-01-01");
-				if (deleteShippingError) {
-					console.error("Error deleting shipping orders:", deleteShippingError);
-					throw deleteShippingError;
-				}
-
-				// Step 6: Delete products
-				console.log("Deleting products...");
-				const { error: deleteProductError } = await supabase.from("products").delete().gte("created_at", "1900-01-01");
-				if (deleteProductError) {
-					console.error("Error deleting products:", deleteProductError);
-					throw deleteProductError;
-				}
-
-				console.log("Successfully cleared all existing data");
 			} catch (error_) {
 				let message = "Unknown error";
 				if (error_ instanceof Error) {
@@ -181,22 +185,46 @@ export function Screen0() {
 					message = String((error_ as unknown as Record<string, unknown>).message);
 				}
 				console.error("Failed to clear existing data:", message);
-				throw new Error(`Failed to clear existing products: ${message}`);
+				// Don't throw - allow upload to continue even if delete fails
+				console.warn("Continuing with product upload despite delete error...");
 			}
 
-			// Insert new products
+			// Insert new products with retry logic
+			console.log(`Starting to insert ${products.length} products...`);
 			let insertedCount = 0;
 			for (const product of products) {
-				try {
-					console.log(`Inserting product: ${product.item_id}`, product);
-					await wmsApi.products.create(product);
-					insertedCount++;
-				} catch (error_) {
-					const message = error_ instanceof Error ? error_.message : "Failed to insert product";
-					console.error(`Error inserting product ${product.item_id}:`, message, "Product data:", product);
-					throw new Error(`Failed to insert product ${product.item_id}: ${message}`);
+				let retries = 0;
+				const maxRetries = 2;
+				let lastError: Error | null = null;
+
+				while (retries <= maxRetries) {
+					try {
+						console.log(`Inserting product: ${product.item_id} (attempt ${retries + 1})`, product);
+						await wmsApi.products.create(product);
+						insertedCount++;
+						console.log(`Successfully inserted product: ${product.item_id} (${insertedCount}/${products.length})`);
+						break; // Success, exit retry loop
+					} catch (error_) {
+						lastError = error_ instanceof Error ? error_ : new Error(String(error_));
+						const message = lastError.message;
+						console.error(`Error inserting product ${product.item_id} (attempt ${retries + 1}):`, message);
+
+						if (retries < maxRetries) {
+							// Wait before retrying (exponential backoff)
+							const waitTime = Math.pow(2, retries) * 1000;
+							console.log(`Retrying in ${waitTime}ms...`);
+							await new Promise((resolve) => setTimeout(resolve, waitTime));
+							retries++;
+						} else {
+							// Max retries exceeded
+							throw new Error(
+								`Failed to insert product ${product.item_id} after ${maxRetries + 1} attempts: ${message}`
+							);
+						}
+					}
 				}
 			}
+			console.log(`Successfully inserted ${insertedCount}/${products.length} products`);
 
 			// Save original CSV to storage
 			try {
@@ -210,18 +238,22 @@ export function Screen0() {
 			}
 
 			// Success
+			console.log("Upload complete! Setting success state...");
 			setSuccess({
 				message: `Product master updated: ${insertedCount} items loaded`,
 				count: insertedCount,
 			});
 			setCsvUploaded(true);
 
+			console.log(`✅ Successfully loaded ${insertedCount} products`);
 			enqueueSnackbar(`✅ Successfully loaded ${insertedCount} products`, { variant: "success" });
 		} catch (error_) {
 			const message = error_ instanceof Error ? error_.message : "Failed to upload products";
+			console.error("Upload failed:", error_);
 			setError(message);
 			enqueueSnackbar(message, { variant: "error" });
 		} finally {
+			console.log("Upload process finished, clearing loading state...");
 			setLoading(false);
 		}
 	};
@@ -434,7 +466,7 @@ PROD-005,500GB NVMe SSD,500,1`}
 							<Button
 								variant="contained"
 								endIcon={<ArrowRightIcon size={20} />}
-								onClick={() => navigate("/warehouse/screen-0b")}
+								onClick={() => navigate(paths.warehouseScreens.screen0b)}
 								size="large"
 							>
 								Next

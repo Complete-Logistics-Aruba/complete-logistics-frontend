@@ -81,6 +81,9 @@ export function Screen1() {
 		getCurrentUser();
 	}, [enqueueSnackbar]);
 
+	// Note: Supabase's autoRefreshToken handles session management automatically
+	// No need for manual refresh - it works across tab switches
+
 	const {
 		register,
 		handleSubmit,
@@ -100,8 +103,13 @@ export function Screen1() {
 		setCsvFile(file);
 		setCsvData(null);
 		setCsvErrors([]);
+		setLoading(true);
 
 		try {
+			// Supabase autoRefreshToken handles session refresh automatically
+			// No need to manually call getSession() - it can hang
+			console.log("Starting CSV upload...");
+
 			// Get products for validation
 			let products: Product[] = [];
 			try {
@@ -124,6 +132,7 @@ export function Screen1() {
 				const rows = parseCSV(content);
 				setCsvData(rows);
 				enqueueSnackbar(`✅ CSV uploaded: ${rows.length} items (will validate on submit)`, { variant: "success" });
+				setLoading(false);
 				return;
 			}
 
@@ -132,16 +141,20 @@ export function Screen1() {
 
 			if (!result.valid) {
 				setCsvErrors(result.errors);
-				enqueueSnackbar(`CSV validation failed: ${result.errors.length} errors found`, { variant: "error" });
+				enqueueSnackbar(`❌ CSV validation failed: ${result.errors.length} errors found`, { variant: "error" });
+				setLoading(false);
 				return;
 			}
 
 			setCsvData(result.data);
-			enqueueSnackbar(`✅ CSV validated: ${result.data.length} items`, { variant: "success" });
+			enqueueSnackbar(`✅ CSV validated: ${result.data.length} items ready to import`, { variant: "success" });
+			setLoading(false);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Failed to validate CSV";
+			console.error("CSV upload error:", error);
 			setCsvErrors([]);
-			enqueueSnackbar(message, { variant: "error" });
+			enqueueSnackbar(`❌ Error: ${message}`, { variant: "error" });
+			setLoading(false);
 		}
 	};
 

@@ -35,7 +35,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
  *
  * @type {SupabaseClient}
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		autoRefreshToken: true,
+		persistSession: true,
+		detectSessionInUrl: true,
+	},
+});
 
 /**
  * Get current session
@@ -59,4 +65,36 @@ export async function getCurrentUser() {
 		data: { user },
 	} = await supabase.auth.getUser();
 	return user;
+}
+
+/**
+ * Setup page visibility listener to handle tab switches
+ *
+ * When the page becomes visible after being hidden (tab switch),
+ * we need to refresh the Supabase session to ensure the connection is alive.
+ * This prevents hanging when making API calls after a tab switch.
+ *
+ * @returns Unsubscribe function
+ */
+export function setupPageVisibilityListener() {
+	const handleVisibilityChange = async () => {
+		if (document.visibilityState === "visible") {
+			console.log("Page became visible - refreshing Supabase session...");
+			try {
+				// Refresh the session to ensure connection is alive
+				// This is safe and won't cause multiple client instances
+				const { data, error } = await supabase.auth.refreshSession();
+				if (error) {
+					console.warn("Session refresh error:", error.message);
+				} else if (data.session) {
+					console.log("Session refreshed successfully");
+				}
+			} catch (error) {
+				console.error("Error refreshing session on tab visibility:", error);
+			}
+		}
+	};
+
+	document.addEventListener("visibilitychange", handleVisibilityChange);
+	return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
 }

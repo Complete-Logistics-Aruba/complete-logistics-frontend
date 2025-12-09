@@ -71,14 +71,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 		setIsLoading(true);
 		try {
 			await authClient.logout();
-			// Don't manually set user to null - let the auth state change listener handle it
-			// This prevents race conditions
-			// Wait a bit for the auth state change listener to fire
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			// Manually clear user state immediately
+			setUser(null);
+			// Reset loading state before navigation
+			setIsLoading(false);
 			// Redirect to login page after logout
 			navigate("/auth/login", { replace: true });
-		} finally {
+		} catch (error) {
+			console.error("Logout error:", error);
+			// Reset loading state even on error
 			setIsLoading(false);
+			// Still navigate to login on error
+			navigate("/auth/login", { replace: true });
 		}
 	};
 

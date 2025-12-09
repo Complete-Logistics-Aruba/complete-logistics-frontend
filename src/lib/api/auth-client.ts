@@ -1,19 +1,6 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-
-// Initialize Supabase client (only place in the app that imports Supabase)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-	throw new Error("Missing Supabase environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
-}
-
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-	auth: {
-		autoRefreshToken: true,
-		persistSession: true,
-	},
-});
+// Import the shared Supabase client instance
+// This ensures only ONE client instance exists in the entire app
+import { supabase } from "@/lib/auth/supabase-client";
 
 /**
  * User profile type - extends Supabase auth user with profile data
@@ -156,13 +143,16 @@ export const authClient = {
 	 */
 	onAuthStateChange(callback: (user: AuthUser | null) => void) {
 		try {
-			const { data } = supabase.auth.onAuthStateChange(async (event, _session) => {
+			const { data } = supabase.auth.onAuthStateChange((event, _session) => {
 				console.log("Auth state changed:", event);
 
 				if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-					// User signed in or token refreshed - fetch full user data
-					const user = await this.getCurrentUser();
-					callback(user);
+					// Defer Supabase calls to avoid deadlock
+					// Use setTimeout(..., 0) to run after callback completes
+					setTimeout(async () => {
+						const user = await this.getCurrentUser();
+						callback(user);
+					}, 0);
 				} else if (event === "SIGNED_OUT") {
 					// User signed out
 					callback(null);
