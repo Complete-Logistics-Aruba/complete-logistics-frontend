@@ -80,6 +80,32 @@ const createNavItems = () => {
 						href: paths.warehouseScreens.screen1,
 						icon: "plus",
 					},
+					{
+						key: "screen-2",
+						title: "Receiving Summary",
+						href: paths.warehouseScreens.screen2,
+						icon: "check-circle",
+					},
+				],
+			},
+			{
+				key: "outbound-cse",
+				title: "Outbound",
+				icon: "arrow-up-right",
+				roles: ["Customer Service", "Admin"],
+				items: [
+					{
+						key: "screen-3",
+						title: "Create Shipping Order",
+						href: paths.warehouseScreens.screen3,
+						icon: "plus",
+					},
+					{
+						key: "screen-4",
+						title: "Register Container",
+						href: paths.warehouseScreens.screen4,
+						icon: "box",
+					},
 				],
 			},
 			{
@@ -99,6 +125,38 @@ const createNavItems = () => {
 						title: "Container Photos",
 						href: paths.warehouseScreens.screen6,
 						icon: "image",
+					},
+					{
+						key: "screen-7",
+						title: "Tally Pallets",
+						href: paths.warehouseScreens.screen7,
+						icon: "package",
+					},
+					{
+						key: "screen-8",
+						title: "Put-Away",
+						href: paths.warehouseScreens.screen8,
+						icon: "arrow-down-left",
+					},
+				],
+			},
+			{
+				key: "outbound-wh",
+				title: "Outbound",
+				icon: "arrow-up-right",
+				roles: ["Warehouse"],
+				items: [
+					{
+						key: "screen-9",
+						title: "Pending Orders",
+						href: paths.warehouseScreens.screen9,
+						icon: "inbox",
+					},
+					{
+						key: "screen-10",
+						title: "Pick Pallets",
+						href: paths.warehouseScreens.screen10,
+						icon: "hand",
 					},
 				],
 			},
@@ -126,13 +184,32 @@ const createNavItems = () => {
 						href: paths.warehouseScreens.screen7,
 						icon: "package",
 					},
+					{
+						key: "screen-8-admin",
+						title: "Put-Away",
+						href: paths.warehouseScreens.screen8,
+						icon: "arrow-down-left",
+					},
+					{
+						key: "screen-9-admin",
+						title: "Pending Orders",
+						href: paths.warehouseScreens.screen9,
+						icon: "inbox",
+					},
+					{
+						key: "screen-10-admin",
+						title: "Pick Pallets",
+						href: paths.warehouseScreens.screen10,
+						icon: "hand",
+					},
 				],
 			}
 		);
 
-		// Screen 6 and Screen 7 are hidden from sidebar
-		// They are only accessible through workflow navigation:
-		// Screen 5 → Screen 6 (Container Photos) → Screen 7 (Tally Pallets)
+		// Screens 6, 7, 8 are also accessible through workflow navigation
+		// Screen 5 → Screen 6 (Container Photos) → Screen 7 (Tally Pallets) → Screen 8 (Put-Away)
+		// Screens 10, 11, 12 are also accessible through workflow navigation
+		// Screen 9 → Screen 10 (Pick Pallets) → Screen 11 (Load Target) → Screen 12 (Load Pallets)
 	}
 
 	return items;

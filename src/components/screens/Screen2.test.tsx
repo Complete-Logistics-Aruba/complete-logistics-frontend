@@ -18,6 +18,7 @@ vi.mock("../../lib/api/wms-api", () => ({
 		getByReceivingOrderId: vi.fn(),
 	},
 	pallets: {
+		getAll: vi.fn(),
 		getFiltered: vi.fn(),
 	},
 	products: {

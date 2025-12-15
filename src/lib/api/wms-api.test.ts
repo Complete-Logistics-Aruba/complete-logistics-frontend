@@ -684,43 +684,24 @@ function mockSupabaseQuery(data: unknown, error: unknown = null) {
 	};
 }
 
-// Helper for aisle queries (2 eq calls: warehouse_id + code)
-function mockSupabaseAisleQuery(data: unknown, error: unknown = null) {
-	const singleMock = vi.fn().mockResolvedValue({ data, error });
-
-	// Create a chain-able eq mock that returns itself
-	const createEqChain = () => ({
-		eq: vi.fn(function () {
-			return createEqChain();
-		}),
-		single: singleMock,
-	});
-
-	const chain = createEqChain();
-
-	return {
-		select: vi.fn().mockReturnValue(chain),
-	};
-}
-
 describe("wmsApi - Location Resolution (Story 5.3)", () => {
 	const mockWarehouseId = "warehouse-123";
 	const mockLocation = {
-		id: "loc-123",
-		code: "W1-A-1-1",
+		location_id: "W1-1-1-A",
 		warehouse_id: mockWarehouseId,
-		type: "RACK",
+		type: "RACK" as const,
 		rack: 1,
 		level: 1,
 		position: "A",
+		is_active: true,
+		is_blocked: false,
 		created_at: "2025-11-26T10:00:00Z",
 	};
 
 	const mockAisleLocation = {
-		id: "loc-aisle",
-		code: "W1-AISLE",
+		location_id: "W1-AISLE-01",
 		warehouse_id: mockWarehouseId,
-		type: "AISLE",
+		type: "AISLE" as const,
 		rack: null,
 		level: null,
 		position: null,
@@ -738,8 +719,11 @@ describe("wmsApi - Location Resolution (Story 5.3)", () => {
 				mockSupabase.from.mockReturnValue(mockSupabaseQuery(mockLocation));
 
 				const result = await locations.resolve(mockWarehouseId, 1, 1, "A");
-				expect(result.id).toBe("loc-123");
-				expect(result.code).toBe("W1-A-1-1");
+				expect(result.location_id).toBe("W1-1-1-A");
+				expect(result.type).toBe("RACK");
+				expect(result.rack).toBe(1);
+				expect(result.level).toBe(1);
+				expect(result.position).toBe("A");
 			});
 
 			it("should resolve boundary value rack 1, level 1, position A (AC: 1-3)", async () => {
@@ -779,21 +763,20 @@ describe("wmsApi - Location Resolution (Story 5.3)", () => {
 		describe("AC: 4 - Aisle location handling", () => {
 			it("should resolve AISLE location (AC: 4)", async () => {
 				const mockSupabase = supabaseClient.supabase as unknown as { from: ReturnType<typeof vi.fn> };
-				mockSupabase.from.mockReturnValue(mockSupabaseAisleQuery(mockAisleLocation));
+				mockSupabase.from.mockReturnValue(mockSupabaseQuery(mockAisleLocation));
 
 				const result = await locations.resolve(mockWarehouseId, "AISLE", 1, "A");
-				expect(result.id).toBe("loc-aisle");
-				expect(result.code).toBe("W1-AISLE");
+				expect(result.location_id).toBe("W1-AISLE-01");
 				expect(result.type).toBe("AISLE");
 			});
 
 			it("should handle AISLE location ignoring level and position (AC: 4)", async () => {
 				const mockSupabase = supabaseClient.supabase as unknown as { from: ReturnType<typeof vi.fn> };
-				mockSupabase.from.mockReturnValue(mockSupabaseAisleQuery(mockAisleLocation));
+				mockSupabase.from.mockReturnValue(mockSupabaseQuery(mockAisleLocation));
 
 				// Level and position should be ignored for AISLE
 				const result = await locations.resolve(mockWarehouseId, "AISLE", 99, "Z");
-				expect(result.code).toBe("W1-AISLE");
+				expect(result.location_id).toBe("W1-AISLE-01");
 			});
 		});
 
@@ -858,7 +841,7 @@ describe("wmsApi - Location Resolution (Story 5.3)", () => {
 				mockSupabase.from.mockReturnValue(mockSupabaseQuery(mockLocation));
 
 				const result = await locations.resolve(mockWarehouseId, "1", 1, "A");
-				expect(result.id).toBe("loc-123");
+				expect(result.location_id).toBe("W1-1-1-A");
 			});
 
 			it("should handle different warehouse IDs", async () => {

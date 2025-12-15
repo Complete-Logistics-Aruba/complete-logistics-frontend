@@ -108,13 +108,10 @@ export function Screen1() {
 		try {
 			// Supabase autoRefreshToken handles session refresh automatically
 			// No need to manually call getSession() - it can hang
-			console.log("Starting CSV upload...");
-
 			// Get products for validation
 			let products: Product[] = [];
 			try {
 				products = await wmsApi.products.getAll();
-				console.log(`Loaded ${products.length} products for validation`);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : "Failed to load products";
 				console.warn(`Warning loading products: ${message}`);
@@ -124,7 +121,6 @@ export function Screen1() {
 
 			// If no products, still allow CSV to be uploaded (will validate at submission)
 			if (!products || products.length === 0) {
-				console.log("No products in system - CSV will be validated at submission time");
 				enqueueSnackbar("⚠️ No products in system yet. CSV will be validated when you submit.", { variant: "info" });
 				// Still parse and show the CSV data
 				const { parseCSV, readFileAsText } = await import("@/utils/csv-validation");
@@ -179,7 +175,6 @@ export function Screen1() {
 				status: "Pending" as const,
 				created_by: currentUser?.id || "system",
 			};
-			console.log("Creating receiving order with:", receivingOrderData);
 			const receivingOrder = await wmsApi.receivingOrders.create(receivingOrderData);
 
 			// Create receiving order lines

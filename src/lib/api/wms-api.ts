@@ -493,9 +493,11 @@ export const pallets = {
 	 */
 	async create(pallet: Omit<Pallet, "id" | "created_at">): Promise<Pallet> {
 		try {
+			console.log("🚀 [PALLETS.CREATE] Creating pallet with data:", pallet);
 			const { data, error } = await supabase.from("pallets").insert([pallet]).select().single();
 
 			if (error) {
+				console.error("❌ [PALLETS.CREATE] Insert error:", error);
 				throw error;
 			}
 
@@ -503,9 +505,34 @@ export const pallets = {
 				throw new Error("Failed to create pallet");
 			}
 
+			console.log("✅ [PALLETS.CREATE] Pallet created successfully!");
+			console.log("  Created pallet ID:", data.id);
+			console.log("  Full pallet:", data);
+
 			return data;
 		} catch (error) {
+			console.error("❌ [PALLETS.CREATE] Error:", error);
 			throw new Error(formatErrorMessage(error, "Failed to create pallet"));
+		}
+	},
+
+	/**
+	 * Get all pallets
+	 *
+	 * @returns Array of all pallets
+	 * @throws Error with user-friendly message
+	 */
+	async getAll(): Promise<Pallet[]> {
+		try {
+			const { data, error } = await supabase.from("pallets").select("*");
+
+			if (error) {
+				throw error;
+			}
+
+			return data || [];
+		} catch (error) {
+			throw new Error(formatErrorMessage(error, "Failed to load pallets"));
 		}
 	},
 
@@ -519,33 +546,60 @@ export const pallets = {
 	async getFiltered(filters: {
 		status?: string;
 		receiving_order_id?: string;
-		shipping_order_id?: string;
-		location_id?: string;
+		shipping_order_id?: string | null;
+		location_id?: string | null;
 	}): Promise<Pallet[]> {
 		try {
-			let query = supabase.from("pallets").select("*");
+			// Fetch ALL pallets first
+			const { data: allPallets, error: fetchError } = await supabase.from("pallets").select("*");
 
-			if (filters.status) {
-				query = query.eq("status", filters.status);
+			if (fetchError) {
+				console.error("❌ [PALLETS.GETFILTERED] Fetch error:", fetchError);
+				throw fetchError;
 			}
+
+			console.log("🔍 [PALLETS.GETFILTERED] Fetched all pallets:", allPallets?.length || 0);
+
+			// Filter in JavaScript to avoid Supabase filter issues
+			let filtered = allPallets || [];
+
+			// Apply receiving_order_id filter FIRST (most specific)
 			if (filters.receiving_order_id) {
-				query = query.eq("receiving_order_id", filters.receiving_order_id);
-			}
-			if (filters.shipping_order_id) {
-				query = query.eq("shipping_order_id", filters.shipping_order_id);
-			}
-			if (filters.location_id) {
-				query = query.eq("location_id", filters.location_id);
-			}
-
-			const { data, error } = await query;
-
-			if (error) {
-				throw error;
+				const orderId = String(filters.receiving_order_id).trim();
+				console.log("🔍 [PALLETS.GETFILTERED] Filtering by receiving_order_id:", orderId);
+				filtered = filtered.filter((p) => {
+					const pOrderId = String(p.receiving_order_id || "").trim();
+					return pOrderId === orderId;
+				});
+				console.log("  Found after receiving_order_id filter:", filtered.length);
 			}
 
-			return data || [];
+			// Then apply other filters (only if explicitly provided)
+			if (filters.status) {
+				filtered = filtered.filter((p) => p.status === filters.status);
+				console.log("  Found after status filter:", filtered.length);
+			}
+
+			// Only apply shipping_order_id filter if explicitly provided in filters object
+			if ("shipping_order_id" in filters) {
+				filtered =
+					filters.shipping_order_id === null || filters.shipping_order_id === undefined
+						? filtered.filter((p) => p.shipping_order_id === null)
+						: filtered.filter((p) => p.shipping_order_id === filters.shipping_order_id);
+			}
+
+			// Only apply location_id filter if explicitly provided in filters object
+			if ("location_id" in filters) {
+				filtered =
+					filters.location_id === null || filters.location_id === undefined
+						? filtered.filter((p) => p.location_id === null)
+						: filtered.filter((p) => p.location_id === filters.location_id);
+			}
+
+			console.log(" [PALLETS.GETFILTERED] Found pallets after filtering:", filtered.length);
+			return filtered;
 		} catch (error) {
+			console.error(" [PALLETS.GETFILTERED] Exception:", error);
 			throw new Error(formatErrorMessage(error, "Failed to load pallets"));
 		}
 	},
@@ -642,12 +696,16 @@ export const shippingOrders = {
 			}
 
 			// Map shipping_order_lines to lines for consistency
-			const mappedData = (data || []).map((order: ShippingOrder) => ({
-				...order,
-				lines: order.lines || [],
-			}));
+			// Supabase returns nested data as shipping_order_lines (table name)
+			const mappedData = (data || []).map((order: unknown) => {
+				const orderData = order as Record<string, unknown>;
+				return {
+					...orderData,
+					lines: (orderData.shipping_order_lines as ShippingOrderLine[]) || [],
+				};
+			});
 
-			return mappedData;
+			return mappedData as (ShippingOrder & { lines?: ShippingOrderLine[] })[];
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Failed to load shipping orders"));
 		}
@@ -771,7 +829,7 @@ export async function getShipNowOrder(
 			return null;
 		}
 
-		// Calculate RemainingQty for each order and filter to those with remaining qty > 0
+		// Filter 3: Order must have remaining quantity for this item
 		const ordersWithRemaining = ordersWithItem.filter((order) => {
 			if (!order.lines) return false;
 
@@ -779,12 +837,8 @@ export async function getShipNowOrder(
 			const line = order.lines.find((l) => l.item_id === itemId);
 			if (!line) return false;
 
-			// Calculate remaining qty: requested_qty - SUM(assigned pallets)
-			// For now, we assume remaining_qty is requested_qty (pallets not yet assigned)
-			// This will be enhanced when pallet assignment logic is implemented
-			const remainingQty = line.requested_qty;
-
-			return remainingQty > 0;
+			// Check if line has remaining quantity
+			return line.requested_qty > 0;
 		});
 
 		if (ordersWithRemaining.length === 0) {
@@ -908,13 +962,16 @@ export const locations = {
 
 			if (rack === "AISLE") {
 				// Aisle zone: level parameter is the zone number (1-4)
+				// Query by type=AISLE and location_id pattern (W1-AISLE-01, W1-AISLE-02, etc.)
 				const zoneNum = String(level).padStart(2, "0");
-				query = query.eq("code", `W1-AISLE-${zoneNum}`);
+				const locationId = `W1-AISLE-${zoneNum}`;
+				query = query.eq("type", "AISLE").eq("location_id", locationId);
 			} else {
 				// Regular rack location
-				const rackNum = String(rack).padStart(2, "0");
-				const levelNum = String(level).padStart(2, "0");
-				query = query.eq("code", `W1-${rackNum}-${levelNum}-${position}`);
+				// Query by type=RACK and rack/level/position coordinates
+				const rackNum = Number(rack);
+				const levelNum = Number(level);
+				query = query.eq("type", "RACK").eq("rack", rackNum).eq("level", levelNum).eq("position", position);
 			}
 
 			const { data, error } = await query.single();

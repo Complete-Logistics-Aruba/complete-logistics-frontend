@@ -1,7 +1,7 @@
 import React from "react";
 
-import { PlaceholderPage } from "@/components/placeholder-page";
+import { Page as LandingPage } from "@/pages/dashboard/landing";
 
 export function Page() {
-	return <PlaceholderPage title="Warehouse" description="Warehouse management and inventory tracking" />;
+	return <LandingPage />;
 }

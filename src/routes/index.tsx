@@ -77,6 +77,12 @@ export const routes: RouteObject[] = [
 				),
 			},
 			{
+				path: "create-shipping-order",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen3").then((module) => ({ default: module.default })))
+				),
+			},
+			{
 				path: "register-empty-container",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen4").then((module) => ({ default: module.default })))
@@ -98,6 +104,42 @@ export const routes: RouteObject[] = [
 				path: "tally-pallets",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/screen7").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "put-away",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen8").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "pending-shipping-orders",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/screen9").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "pick-pallets",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen10").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "select-load-target",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen11").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "load-pallets",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen12").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "shipping-summary",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen13").then((module) => ({ default: module.default })))
 				),
 			},
 		],

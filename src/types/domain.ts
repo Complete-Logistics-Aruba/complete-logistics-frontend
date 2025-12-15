@@ -102,14 +102,15 @@ export interface ShippingOrderLine {
  * Warehouse location
  */
 export interface Location {
-	id: string;
+	location_id: string;
 	warehouse_id: string;
-	code: string;
 	type: "RACK" | "AISLE";
 	rack?: number;
 	level?: number;
 	position?: string;
-	created_at: string;
+	is_active?: boolean;
+	is_blocked?: boolean;
+	created_at?: string;
 }
 
 /**
@@ -128,8 +129,11 @@ export interface Warehouse {
 export interface Manifest {
 	id: string;
 	type: "Container" | "Hand";
+	container_num?: string;
+	seal_num: string;
 	status: "Open" | "Closed";
 	created_at: string;
+	closed_at?: string;
 }
 
 /**

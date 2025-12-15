@@ -15,15 +15,13 @@
 
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Box, Button, Card, CardContent, CircularProgress, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useSnackbar } from "notistack";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-
-import { manifests } from "../../lib/api/wms-api";
 
 // Validation schema
 const containerSchema = z.object({
@@ -54,16 +52,6 @@ export default function Screen4() {
 		try {
 			setIsSubmitting(true);
 
-			// Create manifest
-			const manifestData = {
-				type: "Container" as const,
-				status: "Open" as const,
-				container_num: data.container_num,
-				seal_num: data.seal_num,
-			};
-			console.log("Creating manifest with:", manifestData);
-			const _manifest = await manifests.create(manifestData);
-
 			setSuccessData(data);
 			enqueueSnackbar(`Container registered: ${data.container_num}, Seal ${data.seal_num}`, { variant: "success" });
 
@@ -83,30 +71,28 @@ export default function Screen4() {
 
 	if (successData) {
 		return (
-			<Box sx={{ p: 3, maxWidth: 600, mx: "auto" }}>
-				<Card>
-					<CardContent sx={{ textAlign: "center", p: 4 }}>
-						<CheckCircleIcon size={48} style={{ color: "#28a745", marginBottom: 16 }} />
-						<Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-							Container Registered Successfully!
-						</Typography>
-						<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-							Container: <strong>{successData.container_num}</strong>
-						</Typography>
-						<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-							Seal: <strong>{successData.seal_num}</strong>
-						</Typography>
-						<Typography variant="body2" color="textSecondary">
-							Redirecting to dashboard...
-						</Typography>
-					</CardContent>
-				</Card>
+			<Box sx={{ p: 3 }}>
+				<Box sx={{ textAlign: "center", py: 6 }}>
+					<CheckCircleIcon size={48} style={{ color: "#28a745", marginBottom: 16 }} />
+					<Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
+						Container Registered Successfully!
+					</Typography>
+					<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+						Container: <strong>{successData.container_num}</strong>
+					</Typography>
+					<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+						Seal: <strong>{successData.seal_num}</strong>
+					</Typography>
+					<Typography variant="body2" color="textSecondary">
+						Redirecting to dashboard...
+					</Typography>
+				</Box>
 			</Box>
 		);
 	}
 
 	return (
-		<Box sx={{ p: 3, maxWidth: 600, mx: "auto" }}>
+		<Box sx={{ p: 3 }}>
 			{/* Header */}
 			<Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
 				<Button startIcon={<ArrowLeftIcon size={20} />} onClick={() => navigate(-1)} sx={{ mr: 2 }}>
@@ -117,55 +103,52 @@ export default function Screen4() {
 				</Typography>
 			</Box>
 
+			{/* Description */}
+			<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+				Register an empty container that will leave the warehouse
+			</Typography>
+
 			{/* Form */}
-			<Card>
-				<CardContent sx={{ p: 3 }}>
-					<Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-						Register an empty container that will leave the warehouse
-					</Typography>
+			<form onSubmit={handleSubmit(onSubmit)}>
+				{/* Container Number */}
+				<TextField
+					fullWidth
+					label="Container Number"
+					placeholder="e.g., CONT-001"
+					{...register("container_num")}
+					error={!!errors.container_num}
+					helperText={errors.container_num?.message}
+					sx={{ mb: 2 }}
+					disabled={isSubmitting}
+				/>
 
-					<form onSubmit={handleSubmit(onSubmit)}>
-						{/* Container Number */}
-						<TextField
-							fullWidth
-							label="Container Number"
-							placeholder="e.g., CONT-001"
-							{...register("container_num")}
-							error={!!errors.container_num}
-							helperText={errors.container_num?.message}
-							sx={{ mb: 2 }}
-							disabled={isSubmitting}
-						/>
+				{/* Seal Number */}
+				<TextField
+					fullWidth
+					label="Seal Number"
+					placeholder="e.g., SEAL-12345"
+					{...register("seal_num")}
+					error={!!errors.seal_num}
+					helperText={errors.seal_num?.message}
+					sx={{ mb: 3 }}
+					disabled={isSubmitting}
+				/>
 
-						{/* Seal Number */}
-						<TextField
-							fullWidth
-							label="Seal Number"
-							placeholder="e.g., SEAL-12345"
-							{...register("seal_num")}
-							error={!!errors.seal_num}
-							helperText={errors.seal_num?.message}
-							sx={{ mb: 3 }}
-							disabled={isSubmitting}
-						/>
-
-						{/* Submit Button */}
-						<Button
-							fullWidth
-							variant="contained"
-							color="primary"
-							type="submit"
-							disabled={isSubmitting}
-							sx={{ height: 48 }}
-						>
-							{isSubmitting ? <CircularProgress size={24} /> : "Register Container"}
-						</Button>
-					</form>
-				</CardContent>
-			</Card>
+				{/* Submit Button */}
+				<Button
+					fullWidth
+					variant="contained"
+					color="primary"
+					type="submit"
+					disabled={isSubmitting}
+					sx={{ height: 48, mb: 3 }}
+				>
+					{isSubmitting ? <CircularProgress size={24} /> : "Register Container"}
+				</Button>
+			</form>
 
 			{/* Info */}
-			<Alert severity="info" sx={{ mt: 3 }}>
+			<Alert severity="info">
 				This container will be available for loading pallets in the Loading workflow (Screen 12).
 			</Alert>
 		</Box>

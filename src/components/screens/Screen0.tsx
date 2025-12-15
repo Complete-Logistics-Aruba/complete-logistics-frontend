@@ -85,14 +85,10 @@ export function Screen0() {
 		try {
 			// Supabase autoRefreshToken handles session refresh automatically
 			// No need to manually call getSession() - it can hang
-			console.log("Starting CSV upload...");
-
 			// Validate CSV
 			let result;
 			try {
-				console.log("Starting CSV validation...");
 				result = await validateProductMasterCSV(file);
-				console.log("CSV validation complete:", result);
 			} catch (error_) {
 				const message = error_ instanceof Error ? error_.message : "Failed to validate CSV";
 				console.error("CSV validation error:", error_);
@@ -109,7 +105,6 @@ export function Screen0() {
 				setLoading(false);
 				return;
 			}
-			console.log("CSV validation passed, proceeding with database operations...");
 
 			// Transform data for database
 			const products = result.data.map((row) => ({
@@ -123,25 +118,16 @@ export function Screen0() {
 			// Truncate existing products (delete all with cascade)
 			// Skip delete if there are no existing products to improve performance
 			try {
-				console.log("Checking for existing products...");
-
 				// Quick check: count existing products
-				const { count, error: countError } = await supabase
-					.from("products")
-					.select("*", { count: "exact", head: true });
+				const { error: countError } = await supabase.from("products").select("*", { count: "exact", head: true });
 
 				if (countError) {
 					console.warn("Could not check existing products, skipping delete:", countError.message);
 					// Continue anyway - might be a permissions issue
-				} else if (count === 0) {
-					console.log("No existing products, skipping cascade delete");
 				} else {
-					console.log(`Found ${count} existing products, clearing...`);
-
 					// Helper function to safely delete with timeout
 					const safeDelete = async (table: string) => {
 						try {
-							console.log(`Deleting from ${table}...`);
 							const result = await Promise.race([
 								supabase.from(table).delete().gte("created_at", "1900-01-01"),
 								new Promise((_, reject) => setTimeout(() => reject(new Error(`Delete timeout for ${table}`)), 15_000)),
@@ -174,8 +160,6 @@ export function Screen0() {
 					await safeDelete("receiving_orders");
 					await safeDelete("shipping_orders");
 					await safeDelete("products");
-
-					console.log("Successfully cleared all existing data");
 				}
 			} catch (error_) {
 				let message = "Unknown error";
@@ -190,7 +174,6 @@ export function Screen0() {
 			}
 
 			// Insert new products with retry logic
-			console.log(`Starting to insert ${products.length} products...`);
 			let insertedCount = 0;
 			for (const product of products) {
 				let retries = 0;
@@ -199,10 +182,8 @@ export function Screen0() {
 
 				while (retries <= maxRetries) {
 					try {
-						console.log(`Inserting product: ${product.item_id} (attempt ${retries + 1})`, product);
 						await wmsApi.products.create(product);
 						insertedCount++;
-						console.log(`Successfully inserted product: ${product.item_id} (${insertedCount}/${products.length})`);
 						break; // Success, exit retry loop
 					} catch (error_) {
 						lastError = error_ instanceof Error ? error_ : new Error(String(error_));
@@ -212,7 +193,6 @@ export function Screen0() {
 						if (retries < maxRetries) {
 							// Wait before retrying (exponential backoff)
 							const waitTime = Math.pow(2, retries) * 1000;
-							console.log(`Retrying in ${waitTime}ms...`);
 							await new Promise((resolve) => setTimeout(resolve, waitTime));
 							retries++;
 						} else {
@@ -224,8 +204,6 @@ export function Screen0() {
 					}
 				}
 			}
-			console.log(`Successfully inserted ${insertedCount}/${products.length} products`);
-
 			// Save original CSV to storage
 			try {
 				const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
@@ -238,14 +216,11 @@ export function Screen0() {
 			}
 
 			// Success
-			console.log("Upload complete! Setting success state...");
 			setSuccess({
 				message: `Product master updated: ${insertedCount} items loaded`,
 				count: insertedCount,
 			});
 			setCsvUploaded(true);
-
-			console.log(`✅ Successfully loaded ${insertedCount} products`);
 			enqueueSnackbar(`✅ Successfully loaded ${insertedCount} products`, { variant: "success" });
 		} catch (error_) {
 			const message = error_ instanceof Error ? error_.message : "Failed to upload products";
@@ -253,7 +228,6 @@ export function Screen0() {
 			setError(message);
 			enqueueSnackbar(message, { variant: "error" });
 		} finally {
-			console.log("Upload process finished, clearing loading state...");
 			setLoading(false);
 		}
 	};

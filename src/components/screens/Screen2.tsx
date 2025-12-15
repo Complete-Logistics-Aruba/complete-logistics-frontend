@@ -43,8 +43,9 @@ import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { pallets, products, receivingOrderLines, receivingOrders, storage } from "../../lib/api/wms-api";
-import type { ReceivingOrder } from "../../types/domain";
+import type { ReceivingOrder } from "@/types/domain";
+import { pallets, products, receivingOrderLines, receivingOrders, storage } from "@/lib/api/wms-api";
+import { fileUrlToBase64, sendEmail } from "@/lib/email-service";
 
 interface _ReceivingLine {
 	id: string;
@@ -90,8 +91,9 @@ export default function Screen2() {
 	const [sealNumState, setSealNumState] = useState<string>("");
 	const [uploadedFile, setUploadedFile] = useState<{ name: string; url: string } | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
-	const [_showDeleteConfirm, _setShowDeleteConfirm] = useState(false);
-	const [_isConfirmed, _setIsConfirmed] = useState(false);
+	const [isConfirmed, setIsConfirmed] = useState(false);
+	const [isSendingEmail, setIsSendingEmail] = useState(false);
+	const [refetchKey, setRefetchKey] = useState(0);
 
 	// Load all staged orders
 	useEffect(() => {
@@ -143,10 +145,34 @@ export default function Screen2() {
 				// Fetch receiving order lines
 				const lines = await receivingOrderLines.getByReceivingOrderId(orderId);
 
+				// Debug: Get ALL pallets first to see if any exist
+				const allPallets = await pallets.getAll();
+
 				// Fetch all pallets for this receiving order
-				const palletsList = await pallets.getFiltered({
+				let palletsList = await pallets.getFiltered({
 					receiving_order_id: orderId,
 				});
+
+				// If no pallets found, retry once after a short delay (database replication lag)
+				if (palletsList.length === 0) {
+					console.warn("⚠️ [SCREEN 2] No pallets found on first attempt, retrying...");
+					await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500ms
+					palletsList = await pallets.getFiltered({
+						receiving_order_id: orderId,
+					});
+				}
+
+				// If still no pallets found, check if order ID is correct
+				if (palletsList.length === 0) {
+					console.warn("⚠️ [SCREEN 2] No pallets found for order:", orderId);
+					console.warn("  Checking if pallets exist for this order in all pallets...");
+					const matchingPallets = allPallets.filter((p) => p.receiving_order_id === orderId);
+					console.warn("  Matching pallets:", matchingPallets.length);
+					if (matchingPallets.length > 0) {
+						console.warn("  Found pallets but filter didn't return them!");
+						console.warn("  Matching pallets data:", matchingPallets);
+					}
+				}
 
 				// Build summary rows
 				const rows: SummaryRow[] = [];
@@ -158,10 +184,10 @@ export default function Screen2() {
 					const product = await products.getByItemId(line.item_id);
 
 					// Calculate received qty for this line
-					const receivedQty = palletsList
-						.filter((p) => p.item_id === line.item_id)
-						.reduce((sum, p) => sum + (p.qty || 0), 0);
-
+					// Count ALL pallets for this item (both regular and cross-dock)
+					// Cross-dock pallets are still "received" - they just ship immediately
+					const palletsByItem = palletsList.filter((p) => p.item_id === line.item_id);
+					const receivedQty = palletsByItem.reduce((sum, p) => sum + (p.qty || 0), 0);
 					const difference = receivedQty - line.expected_qty;
 					const hasDiscrepancy = difference !== 0;
 
@@ -192,14 +218,9 @@ export default function Screen2() {
 		};
 
 		loadData();
-	}, [selectedOrderId, receivingOrderId, navigate, enqueueSnackbar]);
+	}, [selectedOrderId, receivingOrderId, navigate, enqueueSnackbar, refetchKey]);
 
 	const handleConfirmFinalCounts = async () => {
-		if (!uploadedFile) {
-			enqueueSnackbar("Please upload the receiving form before confirming.", { variant: "warning" });
-			return;
-		}
-
 		const orderId = selectedOrderId || receivingOrderId;
 
 		if (!orderId) {
@@ -215,24 +236,111 @@ export default function Screen2() {
 				status: "Received",
 			});
 
-			_setIsConfirmed(true);
-			enqueueSnackbar("✅ Receiving order confirmed! Inventory is now locked.", { variant: "success" });
-
-			// Navigate to Screen 4 (Register Container) after confirmation
-			setTimeout(() => {
-				navigate("/warehouse/screen-4", {
-					state: {
-						message: "Receiving order confirmed successfully",
-						receivingOrderId: orderId,
-					},
-				});
-			}, 1500);
+			// Update local state to show form upload section
+			setIsConfirmed(true);
+			setOrderStatus("Received");
+			enqueueSnackbar("✅ Status changed to Received! Now upload the receiving form.", { variant: "success" });
 		} catch (error) {
 			console.error("Error confirming order:", error);
 			const message = error instanceof Error ? error.message : "Failed to confirm order";
 			enqueueSnackbar(`Error: ${message}`, { variant: "error" });
 		} finally {
 			setIsSubmitting(false);
+		}
+	};
+
+	const handleSendEmail = async () => {
+		if (!uploadedFile) {
+			enqueueSnackbar("Please upload a form before sending email", { variant: "warning" });
+			return;
+		}
+
+		const orderId = selectedOrderId || receivingOrderId;
+
+		if (!orderId) {
+			enqueueSnackbar("No receiving order selected", { variant: "error" });
+			return;
+		}
+
+		try {
+			setIsSendingEmail(true);
+			// Get email recipient from environment
+			const emailTo = import.meta.env.VITE_RECEIVING_EMAIL_TO || "receiving@example.com";
+
+			// Fetch receiving order for details
+			const order = await receivingOrders.getById(orderId);
+
+			// Build email body
+			const emailBody = `
+Cargo Received Notification
+
+Container #: ${order.container_num || "N/A"}
+Seal #: ${order.seal_num || "N/A"}
+Order ID: ${orderId}
+
+Summary:
+- Total Expected: ${totalExpected} units
+- Total Received: ${totalReceived} units
+- Difference: ${totalReceived - totalExpected} units
+
+Attached:
+- Receiving Form (${uploadedFile.name})
+- Container Photos (3 images)
+
+Please review and confirm receipt.
+			`.trim();
+
+			// Convert uploaded form to base64
+			const formBase64 = await fileUrlToBase64(uploadedFile.url);
+
+			// Fetch container photos from receiving order
+			const attachments = [
+				{
+					filename: uploadedFile.name,
+					content: formBase64,
+					contentType: uploadedFile.name.endsWith(".pdf") ? "application/pdf" : "image/jpeg",
+				},
+			];
+
+			// Add container photos if available
+			if (order.container_photos && Array.isArray(order.container_photos)) {
+				for (let i = 0; i < order.container_photos.length; i++) {
+					const photoUrl = order.container_photos[i];
+					if (photoUrl) {
+						try {
+							const photoBase64 = await fileUrlToBase64(photoUrl);
+							attachments.push({
+								filename: `container-photo-${i + 1}.jpg`,
+								content: photoBase64,
+								contentType: "image/jpeg",
+							});
+						} catch (photoError) {
+							console.warn(`[Screen 2] Failed to add photo ${i + 1}:`, photoError);
+						}
+					}
+				}
+			}
+
+			// Send email
+			await sendEmail({
+				to: emailTo,
+				subject: `Cargo Received - Container ${order.container_num || "N/A"}`,
+				body: emailBody,
+				attachments,
+			});
+
+			enqueueSnackbar("✅ 'Cargo Received' email sent successfully with photos and form!", { variant: "success" });
+
+			// Navigate back after email sent
+			setTimeout(() => {
+				navigate("/warehouse");
+			}, 2000);
+		} catch (error) {
+			console.error("[Screen 2] Error sending email:", error);
+			const message = error instanceof Error ? error.message : "Failed to send email";
+			enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+		} finally {
+			setIsSendingEmail(false);
 		}
 	};
 
@@ -365,13 +473,16 @@ export default function Screen2() {
 	return (
 		<Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
 			{/* Header */}
-			<Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+			<Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
 				<Button startIcon={<ArrowLeftIcon size={20} />} onClick={() => setShowOrderList(true)} sx={{ mr: 2 }}>
 					Back to Orders
 				</Button>
-				<Typography variant="h5" sx={{ fontWeight: "bold" }}>
+				<Typography variant="h5" sx={{ fontWeight: "bold", flex: 1 }}>
 					Receiving Summary Review
 				</Typography>
+				<Button variant="outlined" onClick={() => setRefetchKey((prev) => prev + 1)} disabled={isLoading}>
+					🔄 Reload Pallets
+				</Button>
 			</Box>
 
 			{/* Order Info */}
@@ -492,58 +603,73 @@ export default function Screen2() {
 				</CardContent>
 			</Card>
 
-			{/* File Upload */}
-			<Card sx={{ mb: 3 }}>
-				<CardContent>
-					<Typography variant="h6" sx={{ mb: 2 }}>
-						Upload Receiving Form
-					</Typography>
-					{uploadedFile ? (
-						<Box>
-							<Typography variant="body2" sx={{ mb: 1 }}>
-								✅ File uploaded: {uploadedFile.name}
-							</Typography>
-							<Button variant="outlined" color="error" size="small" onClick={() => setUploadedFile(null)}>
-								Remove
-							</Button>
-						</Box>
-					) : (
-						<Box>
-							<input
-								type="file"
-								accept=".pdf,.jpg,.jpeg,.png"
-								onChange={(e) => {
-									if (e.target.files?.[0]) {
-										handleFileUpload(e.target.files[0]);
-									}
-								}}
-								style={{ display: "none" }}
-								id="file-upload"
-							/>
-							<label htmlFor="file-upload">
-								<Button variant="contained" component="span" disabled={isUploading}>
-									{isUploading ? "Uploading..." : "Upload Form"}
-								</Button>
-							</label>
-						</Box>
-					)}
-				</CardContent>
-			</Card>
+			{/* Confirm & Proceed Button - Top */}
+			{!isConfirmed && (
+				<Box sx={{ mb: 3 }}>
+					<Button
+						variant="contained"
+						color="primary"
+						size="large"
+						onClick={handleConfirmFinalCounts}
+						disabled={isSubmitting}
+						sx={{ width: "100%" }}
+					>
+						{isSubmitting ? "Confirming..." : "Confirm & Proceed"}
+					</Button>
+				</Box>
+			)}
 
-			{/* Action Buttons */}
-			<Box sx={{ display: "flex", gap: 2 }}>
-				<Button variant="outlined" onClick={() => setShowOrderList(true)}>
-					Back to Orders
-				</Button>
-				<Button
-					variant="contained"
-					color="primary"
-					onClick={handleConfirmFinalCounts}
-					disabled={isSubmitting || !uploadedFile}
-				>
-					{isSubmitting ? "Confirming..." : "Confirm & Proceed"}
-				</Button>
-			</Box>
+			{/* File Upload Section - Only shows after confirmation */}
+			{isConfirmed && (
+				<Card sx={{ mb: 3 }}>
+					<CardContent>
+						<Typography variant="h6" sx={{ mb: 2 }}>
+							Upload Receiving Form
+						</Typography>
+						{uploadedFile ? (
+							<Box>
+								<Typography variant="body2" sx={{ mb: 2, color: "green", fontWeight: "bold" }}>
+									✅ File uploaded: {uploadedFile.name}
+								</Typography>
+								<Button variant="outlined" color="error" size="small" onClick={() => setUploadedFile(null)}>
+									Remove
+								</Button>
+							</Box>
+						) : (
+							<Box>
+								<input
+									type="file"
+									accept=".pdf,.jpg,.jpeg,.png"
+									onChange={(e) => {
+										if (e.target.files?.[0]) {
+											handleFileUpload(e.target.files[0]);
+										}
+									}}
+									style={{ display: "none" }}
+									id="file-upload"
+								/>
+								<label htmlFor="file-upload">
+									<Button variant="contained" component="span" disabled={isUploading}>
+										{isUploading ? "Uploading..." : "Upload Form"}
+									</Button>
+								</label>
+							</Box>
+						)}
+					</CardContent>
+				</Card>
+			)}
+
+			{/* Send Email Button - Only shows after form upload */}
+			{isConfirmed && uploadedFile && (
+				<Box sx={{ display: "flex", gap: 2 }}>
+					<Button variant="outlined" onClick={() => setShowOrderList(true)}>
+						Back to Orders
+					</Button>
+					<Button variant="contained" color="success" size="large" onClick={handleSendEmail} disabled={isSendingEmail}>
+						{isSendingEmail ? "Sending..." : "Send 'Cargo Received' Email"}
+					</Button>
+				</Box>
+			)}
 		</Box>
 	);
 }
