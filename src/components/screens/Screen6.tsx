@@ -87,9 +87,9 @@ export const Screen6: React.FC = () => {
 			setLoadingOrders(true);
 			try {
 				const fetchedOrders = await wmsApi.receivingOrders.list();
-				// Filter for pending orders (without container_photos)
+				// Filter for pending orders (without container_photos or with incomplete photos)
 				const pendingOrders = fetchedOrders.filter(
-					(order) => !order.container_photos || order.container_photos.length === 0
+					(order) => !order.container_photos || order.container_photos.length < 3
 				);
 				setOrders(pendingOrders);
 			} catch (error) {
@@ -165,20 +165,24 @@ export const Screen6: React.FC = () => {
 		setIsSubmitting(true);
 
 		try {
-			// Upload each photo to storage
+			// Upload each photo to storage with unique timestamps
 			const uploadPromises = Object.entries(photos).map(async ([index, { file }]) => {
-				const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-").replaceAll("Z", "");
+				// Create unique timestamp for each photo to prevent overwriting
+				const timestamp = new Date(Date.now() + Number.parseInt(index) * 1000)
+					.toISOString()
+					.replaceAll(/[:.]/g, "-")
+					.replaceAll("Z", "");
 				const filename = `photo_${timestamp}_${index}.jpg`;
 				const path = `${receivingOrderId}/${filename}`;
 
-				await wmsApi.storage.upload("receiving", path, file);
-				return filename;
+				const url = await wmsApi.storage.upload("receiving", path, file);
+				return { url, filename, index };
 			});
 
-			const _photoPaths = await Promise.all(uploadPromises);
+			const _photoUrls = await Promise.all(uploadPromises);
 
 			// Photos are stored in Supabase Storage at: receiving/{orderId}/photo_*.jpg
-			// No need to update receiving_orders table as photos are referenced by path
+			// Screen 2 will fetch them directly from storage
 
 			enqueueSnackbar("✅ Photos uploaded and saved successfully!", { variant: "success", autoHideDuration: 3000 });
 

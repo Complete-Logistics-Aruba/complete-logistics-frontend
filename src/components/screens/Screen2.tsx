@@ -45,6 +45,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import type { ReceivingOrder } from "@/types/domain";
 import { pallets, products, receivingOrderLines, receivingOrders, storage } from "@/lib/api/wms-api";
+import { supabase } from "@/lib/auth/supabase-client";
 import { fileUrlToBase64, sendEmail } from "@/lib/email-service";
 
 interface _ReceivingLine {
@@ -93,7 +94,6 @@ export default function Screen2() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
 	const [isSendingEmail, setIsSendingEmail] = useState(false);
-	const [refetchKey, setRefetchKey] = useState(0);
 
 	// Load all staged orders
 	useEffect(() => {
@@ -102,7 +102,7 @@ export default function Screen2() {
 				try {
 					setLoadingOrders(true);
 					const orders = await receivingOrders.list();
-					// Filter for Staged status only
+					// Filter for Staged status only (Received orders are handled elsewhere in the system)
 					const staged = orders.filter((o: ReceivingOrder) => o.status === "Staged");
 					setStagedOrders(staged);
 					if (staged.length === 0) {
@@ -144,10 +144,6 @@ export default function Screen2() {
 
 				// Fetch receiving order lines
 				const lines = await receivingOrderLines.getByReceivingOrderId(orderId);
-
-				// Debug: Get ALL pallets first to see if any exist
-				const allPallets = await pallets.getAll();
-
 				// Fetch all pallets for this receiving order
 				let palletsList = await pallets.getFiltered({
 					receiving_order_id: orderId,
@@ -155,23 +151,10 @@ export default function Screen2() {
 
 				// If no pallets found, retry once after a short delay (database replication lag)
 				if (palletsList.length === 0) {
-					console.warn("⚠️ [SCREEN 2] No pallets found on first attempt, retrying...");
 					await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500ms
 					palletsList = await pallets.getFiltered({
 						receiving_order_id: orderId,
 					});
-				}
-
-				// If still no pallets found, check if order ID is correct
-				if (palletsList.length === 0) {
-					console.warn("⚠️ [SCREEN 2] No pallets found for order:", orderId);
-					console.warn("  Checking if pallets exist for this order in all pallets...");
-					const matchingPallets = allPallets.filter((p) => p.receiving_order_id === orderId);
-					console.warn("  Matching pallets:", matchingPallets.length);
-					if (matchingPallets.length > 0) {
-						console.warn("  Found pallets but filter didn't return them!");
-						console.warn("  Matching pallets data:", matchingPallets);
-					}
 				}
 
 				// Build summary rows
@@ -218,7 +201,7 @@ export default function Screen2() {
 		};
 
 		loadData();
-	}, [selectedOrderId, receivingOrderId, navigate, enqueueSnackbar, refetchKey]);
+	}, [selectedOrderId, receivingOrderId, navigate, enqueueSnackbar]);
 
 	const handleConfirmFinalCounts = async () => {
 		const orderId = selectedOrderId || receivingOrderId;
@@ -293,7 +276,7 @@ Please review and confirm receipt.
 			// Convert uploaded form to base64
 			const formBase64 = await fileUrlToBase64(uploadedFile.url);
 
-			// Fetch container photos from receiving order
+			// Fetch container photos directly from storage
 			const attachments = [
 				{
 					filename: uploadedFile.name,
@@ -302,15 +285,27 @@ Please review and confirm receipt.
 				},
 			];
 
-			// Add container photos if available
-			if (order.container_photos && Array.isArray(order.container_photos)) {
-				for (let i = 0; i < order.container_photos.length; i++) {
-					const photoUrl = order.container_photos[i];
-					if (photoUrl) {
+			// Get list of files in the receiving order folder
+			try {
+				const { data: files } = await supabase.storage.from("receiving").list(`${orderId}/`, {
+					limit: 100,
+					search: "photo_",
+				});
+
+				// Sort by name to get photos in order
+				const photoFiles =
+					files?.filter((f) => f.name.startsWith("photo_")).sort((a, b) => a.name.localeCompare(b.name)) || [];
+
+				// Add container photos if available
+				for (const [i, photoFile] of photoFiles.entries()) {
+					if (photoFile) {
 						try {
+							const { data: urlData } = supabase.storage.from("receiving").getPublicUrl(`${orderId}/${photoFile.name}`);
+							const photoUrl = urlData.publicUrl;
 							const photoBase64 = await fileUrlToBase64(photoUrl);
+							// Use the actual filename instead of index-based naming
 							attachments.push({
-								filename: `container-photo-${i + 1}.jpg`,
+								filename: photoFile.name.replace("photo_", "container-photo-"),
 								content: photoBase64,
 								contentType: "image/jpeg",
 							});
@@ -319,6 +314,8 @@ Please review and confirm receipt.
 						}
 					}
 				}
+			} catch (listError) {
+				console.warn("[Screen 2] Failed to list photos from storage:", listError);
 			}
 
 			// Send email
@@ -403,7 +400,13 @@ Please review and confirm receipt.
 					<Box
 						sx={{
 							display: "grid",
-							gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+							gridTemplateColumns: {
+								xs: "1fr",
+								sm: "1fr",
+								md: "repeat(2, 1fr)",
+								lg: "repeat(3, 1fr)",
+								xl: "repeat(4, 1fr)",
+							},
 							gap: 2,
 						}}
 					>
@@ -414,9 +417,15 @@ Please review and confirm receipt.
 								sx={{
 									cursor: "pointer",
 									transition: "all 0.3s ease",
+									borderRadius: 2,
+									boxShadow: 2,
+									border: "1px solid rgba(0, 0, 0, 0.08)",
+									background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
 									"&:hover": {
-										boxShadow: 4,
-										transform: "translateY(-4px)",
+										boxShadow: 6,
+										transform: "translateY(-2px)",
+										borderColor: "primary.main",
+										background: "linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%)",
 									},
 								}}
 							>
@@ -471,7 +480,7 @@ Please review and confirm receipt.
 	const totalDifference = totalReceived - totalExpected;
 
 	return (
-		<Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+		<Box sx={{ p: 3 }}>
 			{/* Header */}
 			<Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
 				<Button startIcon={<ArrowLeftIcon size={20} />} onClick={() => setShowOrderList(true)} sx={{ mr: 2 }}>
@@ -480,9 +489,6 @@ Please review and confirm receipt.
 				<Typography variant="h5" sx={{ fontWeight: "bold", flex: 1 }}>
 					Receiving Summary Review
 				</Typography>
-				<Button variant="outlined" onClick={() => setRefetchKey((prev) => prev + 1)} disabled={isLoading}>
-					🔄 Reload Pallets
-				</Button>
 			</Box>
 
 			{/* Order Info */}
