@@ -62,7 +62,7 @@ export interface Pallet {
 	id: string;
 	item_id: string;
 	qty: number;
-	status: "Received" | "Stored" | "Staged" | "Loaded" | "Shipped";
+	status: "Received" | "Stored" | "Staged" | "Loaded" | "Shipped" | "WriteOff";
 	location_id?: string;
 	shipping_order_id?: string;
 	receiving_order_id?: string;

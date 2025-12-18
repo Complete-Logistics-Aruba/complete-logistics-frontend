@@ -66,6 +66,18 @@ const createNavItems = () => {
 						href: paths.warehouseScreens.screen0b,
 						icon: "pencil",
 					},
+					{
+						key: "screen-14",
+						title: "Billing Report",
+						href: paths.warehouseScreens.screen14,
+						icon: "chart-bar",
+					},
+					{
+						key: "screen-15",
+						title: "Inventory Adjustments",
+						href: paths.warehouseScreens.screen15,
+						icon: "trash",
+					},
 				],
 			},
 			{
@@ -105,6 +117,12 @@ const createNavItems = () => {
 						title: "Register Container",
 						href: paths.warehouseScreens.screen4,
 						icon: "box",
+					},
+					{
+						key: "screen-13",
+						title: "Shipping Summary",
+						href: paths.warehouseScreens.screen13,
+						icon: "file-text",
 					},
 				],
 			},

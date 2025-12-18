@@ -38,7 +38,8 @@ export function calculateDayCount(startDate: Date, endDate: Date): number {
 
 /**
  * Calculate storage pallet positions
- * For each pallet in Stored status during range: days_stored × pallet_positions
+ * For each pallet physically in warehouse (Received, Stored, or Staged) during range: days_stored × pallet_positions
+ * Counts any pallet that was in warehouse at any point during the date range
  */
 export function calculateStoragePalletPositions(
 	pallets: (Pallet & { product?: Product })[],
@@ -46,27 +47,40 @@ export function calculateStoragePalletPositions(
 	toDate: Date
 ): number {
 	let total = 0;
+	const from = new Date(fromDate);
+	const to = new Date(toDate);
+
+	// Check if it's a single day range
+	const isSingleDay = from.toDateString() === to.toDateString();
 
 	for (const pallet of pallets) {
-		// Only count pallets in Stored status
-		if (pallet.status !== "Stored") continue;
+		// Only count pallets physically in warehouse (Received, Stored, or Staged)
+		if (!["Received", "Stored", "Staged"].includes(pallet.status)) continue;
 
 		// Skip if no product info
 		if (!pallet.product) continue;
 
-		// Calculate days stored
-		const palletDate = new Date(pallet.created_at);
-		const from = new Date(fromDate);
-		const to = new Date(toDate);
+		// For storage, use received_at or created_at as start date
+		const startDate = pallet.received_at ? new Date(pallet.received_at) : new Date(pallet.created_at);
 
-		// Skip if pallet created outside range
-		if (palletDate < from || palletDate > to) continue;
+		// If pallet was received after range end, skip it
+		if (startDate > to) continue;
 
-		// Calculate days from creation to end of range
-		const daysStored = calculateDayCount(palletDate, to);
+		if (isSingleDay) {
+			// For single day: count all pallets present on that day
+			// Pallet is present if it was received on or before the range date
+			if (startDate <= to) {
+				total += pallet.product.pallet_positions || 0;
+			}
+		} else {
+			// For multi-day: calculate days stored within range
+			// Start from max(pallet received date, range start)
+			const storageStart = new Date(Math.max(startDate.getTime(), from.getTime()));
+			const daysStored = calculateDayCount(storageStart, to);
 
-		// Add to total: days × pallet_positions
-		total += daysStored * (pallet.product.pallet_positions || 0);
+			// Add to total: days × pallet_positions
+			total += daysStored * (pallet.product.pallet_positions || 0);
+		}
 	}
 
 	return total;
@@ -74,7 +88,9 @@ export function calculateStoragePalletPositions(
 
 /**
  * Calculate in pallet positions (standard)
- * SUM(pallet_positions) for pallets received in range, is_cross_dock=false
+ * SUM(pallet_positions) for pallets received, is_cross_dock=false
+ * Counts pallets that are NOT Shipped (i.e., still in warehouse: Received, Stored, Staged, Loaded)
+ * Filters by receiving_order.finalized_at (or created_at as proxy) within date range
  */
 export function calculateInPalletPositions(
 	pallets: (Pallet & { product?: Product })[],
@@ -90,12 +106,12 @@ export function calculateInPalletPositions(
 		// Skip if no product info
 		if (!pallet.product) continue;
 
-		// Check if pallet created in range (received)
-		const palletDate = new Date(pallet.created_at);
-		const from = new Date(fromDate);
-		const to = new Date(toDate);
+		// Count pallets that are NOT shipped (still in warehouse: Received, Stored, Staged, Loaded)
+		if (pallet.status === "Shipped") continue;
 
-		if (palletDate < from || palletDate > to) continue;
+		// Filter by creation date (proxy for receiving_order.finalized_at)
+		const palletDate = new Date(pallet.created_at);
+		if (palletDate < fromDate || palletDate > toDate) continue;
 
 		// Add pallet_positions to total
 		total += pallet.product.pallet_positions || 0;
@@ -106,7 +122,8 @@ export function calculateInPalletPositions(
 
 /**
  * Calculate cross-dock pallet positions
- * SUM(pallet_positions) for pallets created via SHIP-NOW in range
+ * SUM(pallet_positions) for cross-dock pallets (created via SHIP-NOW)
+ * Filters by receiving_order.finalized_at (or created_at as proxy) within date range
  */
 export function calculateCrossDockPalletPositions(
 	pallets: (Pallet & { product?: Product })[],
@@ -122,12 +139,9 @@ export function calculateCrossDockPalletPositions(
 		// Skip if no product info
 		if (!pallet.product) continue;
 
-		// Check if pallet created in range
+		// Filter by creation date (proxy for receiving_order.finalized_at)
 		const palletDate = new Date(pallet.created_at);
-		const from = new Date(fromDate);
-		const to = new Date(toDate);
-
-		if (palletDate < from || palletDate > to) continue;
+		if (palletDate < fromDate || palletDate > toDate) continue;
 
 		// Add pallet_positions to total
 		total += pallet.product.pallet_positions || 0;
@@ -139,6 +153,7 @@ export function calculateCrossDockPalletPositions(
 /**
  * Calculate out pallet positions (standard)
  * SUM(pallet_positions) for pallets shipped in range, is_cross_dock=false, shipment_type != Hand_Delivery
+ * Filters by shipping date within range
  */
 export function calculateOutPalletPositions(
 	pallets: (Pallet & { product?: Product; shippingOrder?: ShippingOrder })[],
@@ -154,18 +169,17 @@ export function calculateOutPalletPositions(
 		// Only count shipped pallets
 		if (pallet.status !== "Shipped") continue;
 
-		// Skip if no product or shipping order info
-		if (!pallet.product || !pallet.shippingOrder) continue;
+		// Skip if no product info
+		if (!pallet.product) continue;
 
 		// Skip hand delivery shipments
-		if (pallet.shippingOrder.shipment_type === "Hand_Delivery") continue;
+		if (pallet.shippingOrder && pallet.shippingOrder.shipment_type === "Hand_Delivery") continue;
 
-		// Check if pallet shipped in range
-		const shippedDate = new Date(pallet.shippingOrder.created_at);
-		const from = new Date(fromDate);
-		const to = new Date(toDate);
-
-		if (shippedDate < from || shippedDate > to) continue;
+		// Filter by shipping date (use shippingOrder.created_at as proxy for manifest.closed_at)
+		if (pallet.shippingOrder) {
+			const shippedDate = new Date(pallet.shippingOrder.created_at);
+			if (shippedDate < fromDate || shippedDate > toDate) continue;
+		}
 
 		// Add pallet_positions to total
 		total += pallet.product.pallet_positions || 0;
@@ -177,6 +191,8 @@ export function calculateOutPalletPositions(
 /**
  * Calculate hand delivery pallet positions
  * SUM(pallet_positions) for pallets shipped via hand delivery in range
+ * Note: Currently uses shippingOrder.created_at as proxy for manifest.closed_at
+ * In production, should join with manifests table and filter by manifest.closed_at where manifest.type='Hand'
  */
 export function calculateHandDeliveryPalletPositions(
 	pallets: (Pallet & { product?: Product; shippingOrder?: ShippingOrder })[],
@@ -195,12 +211,10 @@ export function calculateHandDeliveryPalletPositions(
 		// Only count hand delivery shipments
 		if (pallet.shippingOrder.shipment_type !== "Hand_Delivery") continue;
 
-		// Check if pallet shipped in range
+		// Filter by shipping date (proxy for manifest.closed_at)
+		// In production, this should check manifest.closed_at where manifest.type='Hand'
 		const shippedDate = new Date(pallet.shippingOrder.created_at);
-		const from = new Date(fromDate);
-		const to = new Date(toDate);
-
-		if (shippedDate < from || shippedDate > to) continue;
+		if (shippedDate < fromDate || shippedDate > toDate) continue;
 
 		// Add pallet_positions to total
 		total += pallet.product.pallet_positions || 0;
@@ -218,7 +232,10 @@ export function calculateAllBillingMetrics(
 	toDate: string
 ): BillingMetrics {
 	const from = new Date(fromDate);
+	from.setHours(0, 0, 0, 0); // Start of day
+
 	const to = new Date(toDate);
+	to.setHours(23, 59, 59, 999); // End of day
 
 	return {
 		storage_pallet_positions: calculateStoragePalletPositions(pallets, from, to),

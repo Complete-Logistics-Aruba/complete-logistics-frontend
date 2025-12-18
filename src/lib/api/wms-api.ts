@@ -913,6 +913,31 @@ export const locations = {
 	},
 
 	/**
+	 * Get location by ID
+	 *
+	 * @param location_id - Location ID
+	 * @returns Location object
+	 * @throws Error with user-friendly message
+	 */
+	async getById(location_id: string): Promise<Location> {
+		try {
+			const { data, error } = await supabase.from("locations").select("*").eq("location_id", location_id).single();
+
+			if (error) {
+				throw error;
+			}
+
+			if (!data) {
+				throw new Error(`Location with ID ${location_id} not found`);
+			}
+
+			return data;
+		} catch (error) {
+			throw new Error(formatErrorMessage(error, `Failed to load location ${location_id}`));
+		}
+	},
+
+	/**
 	 * Resolve location by rack/level/position to database location record
 	 *
 	 * This function translates user-selected warehouse coordinates (rack, level, position)

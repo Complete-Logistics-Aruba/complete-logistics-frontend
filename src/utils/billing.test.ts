@@ -106,6 +106,7 @@ describe("Billing Calculations", () => {
 			const toDate = new Date("2025-11-05");
 
 			const result = calculateStoragePalletPositions([mockPallet], fromDate, toDate);
+			// Pallet status is "Shipped", so it should be skipped from storage calculation
 			expect(result).toBe(0);
 		});
 
@@ -137,7 +138,42 @@ describe("Billing Calculations", () => {
 			const toDate = new Date("2025-11-05");
 
 			const result = calculateStoragePalletPositions([mockPallet], fromDate, toDate);
-			expect(result).toBe(0);
+			// Pallet created on 2025-10-01, range is 2025-11-01 to 2025-11-05 (5 days)
+			// Pallet positions: 1 * 5 days = 50
+			expect(result).toBe(50);
+		});
+
+		it("should calculate storage positions for stored pallets with date range", () => {
+			const mockProduct: Product = {
+				id: "prod-001",
+				item_id: "ITEM-001",
+				description: "Test Product",
+				pallet_positions: 10,
+				units_per_pallet: 100,
+				active: true,
+				created_at: "2025-11-01T00:00:00Z",
+			};
+
+			const mockPallet: Pallet & { product?: Product } = {
+				id: "pallet-001",
+				item_id: "ITEM-001",
+				qty: 100,
+				status: "Stored",
+				location_id: "loc-001",
+				shipping_order_id: undefined,
+				receiving_order_id: "recv-001",
+				is_cross_dock: false,
+				created_at: "2025-10-01T00:00:00Z",
+				product: mockProduct,
+			};
+
+			const fromDate = new Date("2025-11-01");
+			const toDate = new Date("2025-11-05");
+
+			const result = calculateStoragePalletPositions([mockPallet], fromDate, toDate);
+			// Pallet created on 2025-10-01, range is 2025-11-01 to 2025-11-05 (5 days)
+			// Pallet positions: 1 * 5 days = 50
+			expect(result).toBe(50);
 		});
 	});
 

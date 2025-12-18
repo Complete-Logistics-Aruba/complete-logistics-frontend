@@ -40,10 +40,10 @@ import { DownloadIcon } from "@phosphor-icons/react/dist/ssr/Download";
 import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { pallets, products, shippingOrders, storage } from "../../lib/api/wms-api";
+import { manifests, pallets, products, shippingOrders, storage } from "../../lib/api/wms-api";
 import { useAuth } from "../../lib/auth/auth-context";
 import { supabase } from "../../lib/auth/supabase-client";
-import type { ShippingOrder } from "../../types/domain";
+import type { Manifest, ShippingOrder } from "../../types/domain";
 import { sendShippingEmail } from "../../utils/shipping-email";
 
 interface LoadedItem {
@@ -59,7 +59,7 @@ export default function Screen13() {
 	const { enqueueSnackbar } = useSnackbar();
 	const { user } = useAuth();
 
-	const { shippingOrderId } = location.state || {};
+	const { shippingOrderId, manifestId } = location.state || {};
 
 	// State
 	const [completedOrders, setCompletedOrders] = useState<ShippingOrder[]>([]);
@@ -70,6 +70,7 @@ export default function Screen13() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [shippingOrder, setShippingOrder] = useState<ShippingOrder | null>(null);
+	const [manifest, setManifest] = useState<Manifest | null>(null);
 	const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
 	const [formFile, setFormFile] = useState<File | null>(null);
 	const [photoFiles, setPhotoFiles] = useState<File[]>([]);
@@ -132,6 +133,37 @@ export default function Screen13() {
 
 				setShippingOrder(order);
 
+				// Fetch manifest data to get container and seal numbers
+				let manifestData: Manifest | null = null;
+				if (manifestId) {
+					try {
+						manifestData = await manifests.getById(manifestId);
+						setManifest(manifestData);
+					} catch (error_) {
+						console.warn("Failed to fetch manifest:", error_);
+					}
+				} else {
+					// Try to find manifest by shipping order
+					try {
+						const allManifests = await manifests.getFiltered({});
+						// Find manifest that contains this shipping order's pallets
+						for (const mani of allManifests) {
+							const { data: manifestPallets } = await supabase
+								.from("pallets")
+								.select("*")
+								.eq("manifest_id", mani.id)
+								.eq("shipping_order_id", orderId);
+							if (manifestPallets && manifestPallets.length > 0) {
+								manifestData = mani;
+								setManifest(mani);
+								break;
+							}
+						}
+					} catch (error_) {
+						console.warn("Failed to find manifest:", error_);
+					}
+				}
+
 				// Fetch loaded pallets using direct Supabase query
 
 				const { data: loadedPalletsData, error: palletsError } = await supabase
@@ -186,7 +218,7 @@ export default function Screen13() {
 		};
 
 		loadData();
-	}, [selectedOrderId, shippingOrderId, navigate, enqueueSnackbar]);
+	}, [selectedOrderId, shippingOrderId, manifestId, navigate, enqueueSnackbar]);
 
 	// Handle order selection
 	const handleSelectOrder = (orderId: string) => {
@@ -483,15 +515,27 @@ export default function Screen13() {
 								variant="outlined"
 							/>
 						</Box>
-						{shippingOrder.shipment_type === "Container_Loading" && (
+						{manifest && manifest.container_num && (
 							<Box>
 								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
 									Container #
 								</Typography>
-								<Typography variant="h6">-</Typography>
+								<Typography variant="h6" sx={{ fontWeight: 600 }}>
+									{manifest.container_num}
+								</Typography>
 							</Box>
 						)}
-						{shippingOrder.seal_num && (
+						{manifest && manifest.seal_num && (
+							<Box>
+								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
+									Seal #
+								</Typography>
+								<Typography variant="h6" sx={{ fontWeight: 600 }}>
+									{manifest.seal_num}
+								</Typography>
+							</Box>
+						)}
+						{shippingOrder.seal_num && !manifest?.seal_num && (
 							<Box>
 								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
 									Seal #
@@ -536,9 +580,6 @@ export default function Screen13() {
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									Qty Loaded
 								</TableCell>
-								<TableCell align="right" sx={{ fontWeight: 600 }}>
-									Pallets
-								</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
@@ -547,7 +588,6 @@ export default function Screen13() {
 									<TableCell sx={{ fontWeight: 500 }}>{item.itemId}</TableCell>
 									<TableCell>{item.description}</TableCell>
 									<TableCell align="right">{item.qtyLoaded}</TableCell>
-									<TableCell align="right">{item.palletCount}</TableCell>
 								</TableRow>
 							))}
 							<TableRow sx={{ backgroundColor: "#f9f9f9", fontWeight: 600 }}>
@@ -556,9 +596,6 @@ export default function Screen13() {
 								</TableCell>
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									{totalQtyLoaded}
-								</TableCell>
-								<TableCell align="right" sx={{ fontWeight: 600 }}>
-									{loadedItems.reduce((sum, item) => sum + item.palletCount, 0)}
 								</TableCell>
 							</TableRow>
 						</TableBody>

@@ -142,6 +142,18 @@ export const routes: RouteObject[] = [
 					React.lazy(() => import("@/components/screens/Screen13").then((module) => ({ default: module.default })))
 				),
 			},
+			{
+				path: "billing-report",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen14").then((module) => ({ default: module.default })))
+				),
+			},
+			{
+				path: "inventory-adjustments",
+				element: React.createElement(
+					React.lazy(() => import("@/components/screens/Screen15").then((module) => ({ default: module.default })))
+				),
+			},
 		],
 	},
 	{

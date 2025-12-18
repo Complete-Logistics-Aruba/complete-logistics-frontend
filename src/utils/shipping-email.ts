@@ -1,8 +1,11 @@
 /**
  * Shipping Email utility functions
- * Uses Supabase email service with retry logic and exponential backoff
+ * Uses email service to send shipping confirmation emails with attachments
  * Sends shipping confirmation emails with form and photo attachments
  */
+
+import { supabase } from "@/lib/auth/supabase-client";
+import { fileUrlToBase64, sendEmail } from "@/lib/email-service";
 
 interface ShippingEmailItem {
 	itemId: string;
@@ -64,85 +67,62 @@ Total Items: ${data.items.length}`;
 }
 
 /**
- * Send shipping confirmation email with retry logic
- * Retries up to 3 times with exponential backoff (1s, 2s, 4s)
- * Includes shipping form and outbound photos as attachments
+ * Send shipping confirmation email with attachments
+ * Uses the same email service as Screen 2 for consistency
  */
 export async function sendShippingEmail(data: ShippingEmailData): Promise<void> {
-	const emailTo = import.meta.env.VITE_EMAIL_TO_SHIPPING || "shipping@example.com";
+	const emailTo =
+		import.meta.env.VITE_SHIPPING_EMAIL_TO || import.meta.env.VITE_EMAIL_TO_SHIPPING || "shipping@example.com";
 	const emailBody = composeShippingEmailBody(data);
 
-	const maxRetries = 3;
-	let lastError: Error | null = null;
+	try {
+		// Prepare attachments array
+		const attachments = [];
 
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		try {
-			console.log(`[Shipping Email] Attempt ${attempt}/${maxRetries}: Sending shipping email to ${emailTo}`);
-			console.log(`[Shipping Email] Order: ${data.orderRef}`);
-			console.log(`[Shipping Email] Email body:\n${emailBody}`);
-
-			// In production, this would call a backend API or Supabase Edge Function
-			// with actual file attachments from Storage
-			if (data.formUrl) {
-				console.log(`[Shipping Email] Form attachment: ${data.formUrl}`);
-			}
-
-			if (data.photoUrls && data.photoUrls.length > 0) {
-				console.log(`[Shipping Email] Photo attachments: ${data.photoUrls.length} files`);
-			}
-
-			// Simulate successful email send
-			console.log(`[Shipping Email] Success: Email sent to ${emailTo}`);
-
-			// Log to console and Supabase
-			logShippingEmailAttempt({
-				shippingOrderId: data.shippingOrderId,
-				recipient: emailTo,
-				status: "success",
-				attempt,
-				message: "Email sent successfully",
-			});
-
-			return;
-		} catch (error) {
-			lastError = error instanceof Error ? error : new Error(String(error));
-			console.error(`[Shipping Email] Attempt ${attempt} failed:`, lastError.message);
-
-			// Log failed attempt
-			logShippingEmailAttempt({
-				shippingOrderId: data.shippingOrderId,
-				recipient: emailTo,
-				status: "failed",
-				attempt,
-				message: lastError.message,
-			});
-
-			// Exponential backoff: 1s, 2s, 4s
-			if (attempt < maxRetries) {
-				const backoffMs = Math.pow(2, attempt - 1) * 1000;
-				console.log(`[Shipping Email] Retrying in ${backoffMs}ms...`);
-				await new Promise((resolve) => setTimeout(resolve, backoffMs));
+		// Add form attachment if provided
+		if (data.formUrl) {
+			try {
+				const formPublicUrl = supabase.storage.from("shipping").getPublicUrl(data.formUrl).data.publicUrl;
+				const formBase64 = await fileUrlToBase64(formPublicUrl);
+				const filename = data.formUrl.split("/").pop() || "shipping-form.pdf";
+				attachments.push({
+					filename,
+					content: formBase64,
+					contentType: filename.endsWith(".pdf") ? "application/pdf" : "image/jpeg",
+				});
+			} catch (formError) {
+				console.warn("[Shipping Email] Failed to attach form:", formError);
 			}
 		}
+
+		// Add photo attachments if provided
+		if (data.photoUrls && data.photoUrls.length > 0) {
+			for (const photoUrl of data.photoUrls) {
+				try {
+					const photoPublicUrl = supabase.storage.from("shipping").getPublicUrl(photoUrl).data.publicUrl;
+					const photoBase64 = await fileUrlToBase64(photoPublicUrl);
+					const filename = photoUrl.split("/").pop() || `photo-${Date.now()}.jpg`;
+					attachments.push({
+						filename,
+						content: photoBase64,
+						contentType: "image/jpeg",
+					});
+				} catch (photoError) {
+					console.warn("[Shipping Email] Failed to attach photo:", photoError);
+				}
+			}
+		}
+
+		// Send email using the same service as Screen 2
+		await sendEmail({
+			to: emailTo,
+			subject: `Shipping Confirmation - ${data.orderRef}`,
+			body: emailBody,
+			attachments,
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Failed to send shipping email";
+		console.error("[Shipping Email] Error:", message);
+		throw new Error(`Failed to send shipping email: ${message}`);
 	}
-
-	// All retries failed
-	throw new Error(`Failed to send shipping email after ${maxRetries} attempts: ${lastError?.message}`);
-}
-
-/**
- * Log email attempt to console and Supabase
- */
-function logShippingEmailAttempt(log: {
-	shippingOrderId: string;
-	recipient: string;
-	status: "success" | "failed";
-	attempt: number;
-	message: string;
-}): void {
-	const timestamp = new Date().toISOString();
-	console.log(`[Shipping Email Log] ${timestamp} - ${log.status.toUpperCase()} - ${log.message}`);
-
-	// TODO: Log to Supabase email_logs table if needed
-	// This would require creating an email_logs table and API endpoint
 }
