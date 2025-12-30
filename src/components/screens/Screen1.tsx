@@ -41,13 +41,12 @@ import { z } from "zod";
 
 import type { Product, User } from "@/types/domain";
 import { wmsApi } from "@/lib/api";
+import { formatContainerNumber, getContainerNumberPlaceholder } from "@/lib/formatters";
+import { receivingOrderSchema } from "@/lib/validators";
 import { FileUpload, LoadingSpinner } from "@/components/core";
 
 // Form schema
-const receivingOrderSchema = z.object({
-	container_num: z.string().min(1, "Container number is required"),
-	seal_num: z.string().min(1, "Seal number is required"),
-});
+const receivingOrderFormSchema = receivingOrderSchema;
 
 type ReceivingOrderFormData = z.infer<typeof receivingOrderSchema>;
 
@@ -89,9 +88,20 @@ export function Screen1() {
 		handleSubmit,
 		formState: { errors: formErrors },
 		watch,
+		reset,
+		setValue,
 	} = useForm<ReceivingOrderFormData>({
-		resolver: zodResolver(receivingOrderSchema),
+		resolver: zodResolver(receivingOrderFormSchema),
 	});
+
+	// Watch container number to format it automatically
+	const containerNumValue = watch("container_num");
+
+	// Format container number on change
+	const handleContainerNumChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const formatted = formatContainerNumber(event.target.value);
+		setValue("container_num", formatted);
+	};
 
 	// Note: containerNum and sealNum are watched but not used in this component
 	// They are available for future use or debugging
@@ -168,6 +178,23 @@ export function Screen1() {
 
 		setLoading(true);
 		try {
+			// Check for duplicate receiving orders with same container and seal
+			const existingOrders = await wmsApi.receivingOrders.list();
+			const duplicate = existingOrders.find(
+				(order: { id: string; container_num: string; seal_num: string }) =>
+					order.container_num.toLowerCase() === data.container_num.toLowerCase() &&
+					order.seal_num.toLowerCase() === data.seal_num.toLowerCase()
+			);
+
+			if (duplicate) {
+				enqueueSnackbar(
+					`⚠️ A receiving order already exists for container ${data.container_num} with seal ${data.seal_num} (Order ID: ${duplicate.id})`,
+					{ variant: "warning", autoHideDuration: 6000 }
+				);
+				setLoading(false);
+				return;
+			}
+
 			// Create receiving order
 			const receivingOrderData = {
 				container_num: data.container_num,
@@ -200,6 +227,12 @@ export function Screen1() {
 				sealNum: data.seal_num,
 			});
 			setShowConfirmModal(true);
+
+			// Reset form and clear CSV data after successful creation
+			reset();
+			setCsvFile(null);
+			setCsvData(null);
+			setCsvErrors([]);
 
 			enqueueSnackbar(`✅ Receiving order created: Container ${data.container_num}, Seal ${data.seal_num}`, {
 				variant: "success",
@@ -245,10 +278,12 @@ export function Screen1() {
 									{/* Container Number */}
 									<TextField
 										label="Container Number *"
-										placeholder="e.g., CONT-12345"
+										placeholder={getContainerNumberPlaceholder()}
 										{...register("container_num")}
+										onChange={handleContainerNumChange}
+										value={containerNumValue || ""}
 										error={!!formErrors.container_num}
-										helperText={formErrors.container_num?.message}
+										helperText={formErrors.container_num?.message || "Format: CONT-1234567 (4 letters, 7 numbers)"}
 										fullWidth
 										disabled={loading}
 									/>
@@ -377,9 +412,6 @@ export function Screen1() {
 						</Typography>
 						<Typography>
 							<strong>Seal:</strong> {successData?.sealNum}
-						</Typography>
-						<Typography>
-							<strong>Items:</strong> {csvData?.length}
 						</Typography>
 						<Alert severity="success">
 							Receiving order has been created successfully. The warehouse team will now process this order starting

@@ -23,14 +23,11 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { formatContainerNumber, getContainerNumberPlaceholder } from "../../lib/formatters";
+import { containerSchema } from "../../lib/validators";
+
 // Validation schema
-const containerSchema = z.object({
-	container_num: z
-		.string()
-		.min(1, "Container number is required")
-		.min(3, "Container number must be at least 3 characters"),
-	seal_num: z.string().min(1, "Seal number is required").min(3, "Seal number must be at least 3 characters"),
-});
+const containerFormSchema = containerSchema;
 
 type ContainerFormData = z.infer<typeof containerSchema>;
 
@@ -44,17 +41,26 @@ export default function Screen4() {
 		register,
 		handleSubmit,
 		formState: { errors },
+		watch,
+		setValue,
 	} = useForm<ContainerFormData>({
-		resolver: zodResolver(containerSchema),
+		resolver: zodResolver(containerFormSchema),
 	});
+
+	// Watch container number to format it automatically
+	const containerNumValue = watch("container_num");
+
+	// Format container number on change
+	const handleContainerNumChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const formatted = formatContainerNumber(event.target.value);
+		setValue("container_num", formatted);
+	};
 
 	const onSubmit = async (data: ContainerFormData) => {
 		try {
 			setIsSubmitting(true);
-
 			setSuccessData(data);
-			enqueueSnackbar(`Container registered: ${data.container_num}, Seal ${data.seal_num}`, { variant: "success" });
-
+			enqueueSnackbar(`✅ Container registered: ${data.container_num}`, { variant: "success" });
 			// Redirect after 2 seconds
 			setTimeout(() => {
 				navigate("/warehouse");
@@ -114,10 +120,12 @@ export default function Screen4() {
 				<TextField
 					fullWidth
 					label="Container Number"
-					placeholder="e.g., CONT-001"
+					placeholder={getContainerNumberPlaceholder()}
 					{...register("container_num")}
+					onChange={handleContainerNumChange}
+					value={containerNumValue || ""}
 					error={!!errors.container_num}
-					helperText={errors.container_num?.message}
+					helperText={errors.container_num?.message || "Format: CONT-1234567 (4 letters, 7 numbers)"}
 					sx={{ mb: 2 }}
 					disabled={isSubmitting}
 				/>

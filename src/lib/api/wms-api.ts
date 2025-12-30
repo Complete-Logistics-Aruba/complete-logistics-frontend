@@ -493,11 +493,9 @@ export const pallets = {
 	 */
 	async create(pallet: Omit<Pallet, "id" | "created_at">): Promise<Pallet> {
 		try {
-			console.log("🚀 [PALLETS.CREATE] Creating pallet with data:", pallet);
 			const { data, error } = await supabase.from("pallets").insert([pallet]).select().single();
 
 			if (error) {
-				console.error("❌ [PALLETS.CREATE] Insert error:", error);
 				throw error;
 			}
 
@@ -505,13 +503,8 @@ export const pallets = {
 				throw new Error("Failed to create pallet");
 			}
 
-			console.log("✅ [PALLETS.CREATE] Pallet created successfully!");
-			console.log("  Created pallet ID:", data.id);
-			console.log("  Full pallet:", data);
-
 			return data;
 		} catch (error) {
-			console.error("❌ [PALLETS.CREATE] Error:", error);
 			throw new Error(formatErrorMessage(error, "Failed to create pallet"));
 		}
 	},
@@ -558,26 +551,21 @@ export const pallets = {
 				throw fetchError;
 			}
 
-			console.log("🔍 [PALLETS.GETFILTERED] Fetched all pallets:", allPallets?.length || 0);
-
 			// Filter in JavaScript to avoid Supabase filter issues
 			let filtered = allPallets || [];
 
 			// Apply receiving_order_id filter FIRST (most specific)
 			if (filters.receiving_order_id) {
 				const orderId = String(filters.receiving_order_id).trim();
-				console.log("🔍 [PALLETS.GETFILTERED] Filtering by receiving_order_id:", orderId);
 				filtered = filtered.filter((p) => {
 					const pOrderId = String(p.receiving_order_id || "").trim();
 					return pOrderId === orderId;
 				});
-				console.log("  Found after receiving_order_id filter:", filtered.length);
 			}
 
 			// Then apply other filters (only if explicitly provided)
 			if (filters.status) {
 				filtered = filtered.filter((p) => p.status === filters.status);
-				console.log("  Found after status filter:", filtered.length);
 			}
 
 			// Only apply shipping_order_id filter if explicitly provided in filters object
@@ -596,10 +584,8 @@ export const pallets = {
 						: filtered.filter((p) => p.location_id === filters.location_id);
 			}
 
-			console.log(" [PALLETS.GETFILTERED] Found pallets after filtering:", filtered.length);
 			return filtered;
 		} catch (error) {
-			console.error(" [PALLETS.GETFILTERED] Exception:", error);
 			throw new Error(formatErrorMessage(error, "Failed to load pallets"));
 		}
 	},
@@ -793,22 +779,6 @@ export const shippingOrders = {
 	},
 };
 
-/**
- * Get the earliest shipping order with remaining qty for an item (FIFO)
- *
- * FIFO Logic: Selects the shipping order with the earliest created_at timestamp
- * that has remaining quantity to fulfill for the given item.
- *
- * @param itemId - Product item ID to find orders for
- * @param shippingOrders - Array of shipping orders to filter
- * @returns ShippingOrder with earliest created_at and remaining qty > 0, or null if none found
- *
- * @example
- * const order = await getShipNowOrder('ITEM-123', shippingOrders);
- * if (order) {
- *   console.log(`Fulfilling order ${order.id} created at ${order.created_at}`);
- * }
- */
 export async function getShipNowOrder(
 	itemId: string,
 	shippingOrders: (ShippingOrder & { lines?: ShippingOrderLine[] })[]
@@ -900,7 +870,7 @@ export const locations = {
 	 */
 	async getAll(): Promise<Location[]> {
 		try {
-			const { data, error } = await supabase.from("locations").select("*").order("code", { ascending: true });
+			const { data, error } = await supabase.from("locations").select("*").order("location_id", { ascending: true });
 
 			if (error) {
 				throw error;
@@ -937,50 +907,6 @@ export const locations = {
 		}
 	},
 
-	/**
-	 * Resolve location by rack/level/position to database location record
-	 *
-	 * This function translates user-selected warehouse coordinates (rack, level, position)
-	 * into a valid location database record. It handles both regular rack locations and
-	 * the specific aisle zones (W1-AISLE-01 through W1-AISLE-04).
-	 *
-	 * **Location Structure:**
-	 * - Racks: 1-8
-	 * - Levels: 1-4
-	 * - Positions: A-T (20 positions per level)
-	 * - Aisle Zones: W1-AISLE-01, W1-AISLE-02, W1-AISLE-03, W1-AISLE-04
-	 *
-	 * **Usage Examples:**
-	 * ```typescript
-	 * // Resolve regular rack location
-	 * const location = await wmsApi.locations.resolve('warehouse-1', 5, 2, 'G');
-	 * // Returns: { id: 'loc-123', code: 'W1-05-02-G', warehouse_id: 'warehouse-1', ... }
-	 *
-	 * // Resolve aisle zone location (zone 1-4)
-	 * const aisleLocation = await wmsApi.locations.resolve('warehouse-1', 'AISLE', 1, 'A');
-	 * // Returns: { id: 'loc-aisle-01', code: 'W1-AISLE-01', warehouse_id: 'warehouse-1', ... }
-	 * ```
-	 *
-	 * @param warehouse_id - Warehouse UUID (e.g., from warehouses.getDefault())
-	 * @param rack - Rack number (1-8) or 'AISLE' for aisle zone location
-	 * @param level - Level number (1-4), or aisle zone number (1-4) if rack='AISLE'
-	 * @param position - Position letter (A-T), ignored for aisle locations
-	 * @returns Location object with id, code, warehouse_id, and other metadata
-	 * @throws Error if location not found or database error occurs
-	 *
-	 * @example
-	 * try {
-	 *   // Regular rack location
-	 *   const location = await wmsApi.locations.resolve(warehouseId, 3, 1, 'M');
-	 *   console.log(`Resolved to location: ${location.code}`); // W1-03-01-M
-	 *
-	 *   // Aisle zone location (zone 2)
-	 *   const aisleLocation = await wmsApi.locations.resolve(warehouseId, 'AISLE', 2, 'A');
-	 *   console.log(`Resolved to aisle: ${aisleLocation.code}`); // W1-AISLE-02
-	 * } catch (error) {
-	 *   console.error('Location not found:', error.message);
-	 * }
-	 */
 	async resolve(warehouse_id: string, rack: number | string, level: number, position: string): Promise<Location> {
 		try {
 			let query = supabase.from("locations").select("*").eq("warehouse_id", warehouse_id);
@@ -1040,14 +966,11 @@ export const storage = {
 	 */
 	async upload(bucket: string, path: string, file: File): Promise<string> {
 		try {
-			console.log(`Uploading to bucket: ${bucket}, path: ${path}, file size: ${file.size}`);
-
 			// First try with upsert
 			let uploadResult = await supabase.storage.from(bucket).upload(path, file, { upsert: true, cacheControl: "3600" });
 
 			// If RLS error, try without upsert
 			if (uploadResult.error && uploadResult.error.message?.includes("row-level security")) {
-				console.log("RLS error detected, retrying without upsert...");
 				uploadResult = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600" });
 			}
 
@@ -1061,16 +984,10 @@ export const storage = {
 			if (!data) {
 				throw new Error("Upload failed - no data returned");
 			}
-
-			console.log("Upload successful:", data);
-
 			// Get public URL
 			const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
-
-			console.log("Public URL:", urlData.publicUrl);
 			return urlData.publicUrl;
 		} catch (error) {
-			console.error("Upload error details:", error);
 			throw new Error(formatErrorMessage(error, "Failed to upload file"));
 		}
 	},
@@ -1183,10 +1100,6 @@ export const email = {
 			if (!to || !subject || !body) {
 				throw new Error("Email requires to, subject, and body");
 			}
-
-			// TODO: Call Supabase Edge Function to send email
-			console.log("Email would be sent to:", to, "Subject:", subject);
-
 			return true;
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Failed to send email"));
@@ -1207,7 +1120,6 @@ export const manifests = {
 	 */
 	async create(manifest: Omit<Manifest, "id" | "created_at">): Promise<Manifest> {
 		try {
-			console.log("Creating manifest with data:", manifest);
 			const { data, error } = await supabase
 				.from("manifests")
 				.insert([manifest])

@@ -166,7 +166,7 @@ const createNavItems = () => {
 				items: [
 					{
 						key: "screen-9",
-						title: "Pending Orders",
+						title: "Pending Shipping Orders",
 						href: paths.warehouseScreens.screen9,
 						icon: "inbox",
 					},
@@ -210,7 +210,7 @@ const createNavItems = () => {
 					},
 					{
 						key: "screen-9-admin",
-						title: "Pending Orders",
+						title: "Pending Shipping Orders",
 						href: paths.warehouseScreens.screen9,
 						icon: "inbox",
 					},

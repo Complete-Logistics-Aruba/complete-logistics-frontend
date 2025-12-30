@@ -87,9 +87,11 @@ export const Screen6: React.FC = () => {
 			setLoadingOrders(true);
 			try {
 				const fetchedOrders = await wmsApi.receivingOrders.list();
-				// Filter for pending orders (without container_photos or with incomplete photos)
+				// Filter for pending orders that haven't been processed yet
+				// Only show orders with status 'Pending' or 'Unloading'
+				// Photos are stored in Supabase Storage, we don't track them in the database
 				const pendingOrders = fetchedOrders.filter(
-					(order) => !order.container_photos || order.container_photos.length < 3
+					(order) => order.status === "Pending" || order.status === "Unloading"
 				);
 				setOrders(pendingOrders);
 			} catch (error) {
@@ -181,8 +183,10 @@ export const Screen6: React.FC = () => {
 
 			const _photoUrls = await Promise.all(uploadPromises);
 
-			// Photos are stored in Supabase Storage at: receiving/{orderId}/photo_*.jpg
-			// Screen 2 will fetch them directly from storage
+			// Update receiving order status (photos are stored in Supabase Storage)
+			await wmsApi.receivingOrders.update(receivingOrderId, {
+				status: "Unloading",
+			});
 
 			enqueueSnackbar("✅ Photos uploaded and saved successfully!", { variant: "success", autoHideDuration: 3000 });
 

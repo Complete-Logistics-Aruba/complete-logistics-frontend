@@ -102,7 +102,7 @@ export default function Screen2() {
 				try {
 					setLoadingOrders(true);
 					const orders = await receivingOrders.list();
-					// Filter for Staged status only (Received orders are handled elsewhere in the system)
+					// Filter for Staged status only (Received orders are completed and should not appear in list)
 					const staged = orders.filter((o: ReceivingOrder) => o.status === "Staged");
 					setStagedOrders(staged);
 					if (staged.length === 0) {
@@ -122,6 +122,9 @@ export default function Screen2() {
 	const handleSelectOrder = (orderId: string) => {
 		setSelectedOrderId(orderId);
 		setShowOrderList(false);
+		// Reset confirmation state when selecting a new order
+		setIsConfirmed(false);
+		setUploadedFile(null);
 	};
 
 	// Load order data
@@ -214,15 +217,10 @@ export default function Screen2() {
 		try {
 			setIsSubmitting(true);
 
-			// Update receiving order status to 'Received'
-			await receivingOrders.update(orderId, {
-				status: "Received",
-			});
-
-			// Update local state to show form upload section
+			// DON'T update order status yet - only set local state
+			// Order status should only change to "Received" after email is sent
 			setIsConfirmed(true);
-			setOrderStatus("Received");
-			enqueueSnackbar("✅ Status changed to Received! Now upload the receiving form.", { variant: "success" });
+			enqueueSnackbar("✅ Counts confirmed! Now upload the receiving form and send email.", { variant: "success" });
 		} catch (error) {
 			console.error("Error confirming order:", error);
 			const message = error instanceof Error ? error.message : "Failed to confirm order";
@@ -326,12 +324,24 @@ Please review and confirm receipt.
 				attachments,
 			});
 
-			enqueueSnackbar("✅ 'Cargo Received' email sent successfully with photos and form!", { variant: "success" });
+			// NOW update the receiving order status to 'Received' after email is sent
+			await receivingOrders.update(orderId, {
+				status: "Received",
+			});
 
-			// Navigate back after email sent
+			// Update local state
+			setOrderStatus("Received");
+			enqueueSnackbar("✅ 'Cargo Received' email sent successfully and order marked as Received!", {
+				variant: "success",
+			});
+
+			// Show success message for 3 seconds, then remove from list and navigate
 			setTimeout(() => {
+				// Remove the order from the staged orders list
+				setStagedOrders((prev) => prev.filter((order) => order.id !== orderId));
+				// Navigate back to warehouse
 				navigate("/warehouse");
-			}, 2000);
+			}, 3000);
 		} catch (error) {
 			console.error("[Screen 2] Error sending email:", error);
 			const message = error instanceof Error ? error.message : "Failed to send email";
@@ -365,7 +375,12 @@ Please review and confirm receipt.
 			}
 
 			// Upload file to Supabase Storage
-			const fileName = `${Date.now()}-${file.name}`;
+			// Sanitize filename to remove spaces and special characters that cause upload errors
+			const sanitizedFileName = file.name
+				.replaceAll(/[^a-zA-Z0-9.-]/g, "_") // Replace special chars with underscores
+				.replaceAll(/_{2,}/g, "_") // Replace multiple underscores with single
+				.toLowerCase(); // Convert to lowercase for consistency
+			const fileName = `${Date.now()}-${sanitizedFileName}`;
 			const url = await storage.upload("receiving", `${orderId}/${fileName}`, file);
 			setUploadedFile({ name: file.name, url });
 			enqueueSnackbar(`✅ ${file.name} uploaded successfully`, { variant: "success" });

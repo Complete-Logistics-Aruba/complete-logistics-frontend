@@ -133,7 +133,7 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		expect(screen.getByText(/2 orders waiting to be picked/i)).toBeInTheDocument();
 	});
 
-	it("should filter for Pending and Picking status only", async () => {
+	it("should filter for Pending, Picking, and Loading status", async () => {
 		const mockOrders: ShippingOrder[] = [
 			{
 				id: "order-1",
@@ -146,7 +146,7 @@ describe("Screen 9: Pending Shipping Orders", () => {
 				id: "order-2",
 				order_ref: "ORD-002",
 				shipment_type: "Container_Loading",
-				status: "Loading", // Should be filtered out
+				status: "Loading", // Should now be included
 				created_at: "2025-11-26T10:05:00Z",
 			},
 			{
@@ -155,6 +155,13 @@ describe("Screen 9: Pending Shipping Orders", () => {
 				shipment_type: "Hand_Delivery",
 				status: "Picking",
 				created_at: "2025-11-26T10:10:00Z",
+			},
+			{
+				id: "order-4",
+				order_ref: "ORD-004",
+				shipment_type: "Hand_Delivery",
+				status: "Completed", // Should be filtered out
+				created_at: "2025-11-26T10:15:00Z",
 			},
 		];
 
@@ -166,8 +173,9 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
 		expect(screen.getByText("ORD-001")).toBeInTheDocument();
+		expect(screen.getByText("ORD-002")).toBeInTheDocument(); // Now visible
 		expect(screen.getByText("ORD-003")).toBeInTheDocument();
-		expect(screen.queryByText("ORD-002")).not.toBeInTheDocument();
+		expect(screen.queryByText("ORD-004")).not.toBeInTheDocument(); // Still filtered out
 	});
 
 	it("should have Start Picking button on each card", async () => {

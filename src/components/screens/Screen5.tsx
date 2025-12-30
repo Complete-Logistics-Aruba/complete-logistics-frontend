@@ -48,7 +48,8 @@ export default function Screen5() {
 				// Fetch all receiving orders
 				const allOrders = await receivingOrders.list();
 
-				// Filter for pending orders (awaiting container photos)
+				// Filter for pending orders that haven't been processed yet
+				// Only show orders with status 'Pending' (awaiting container photos)
 				const pendingOrders = allOrders.filter((order) => order.status === "Pending");
 
 				// For each order, count the items

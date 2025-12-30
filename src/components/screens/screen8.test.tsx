@@ -10,7 +10,7 @@ import { SnackbarProvider } from "notistack";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pallets as palletsApi, products } from "../../lib/api/wms-api";
+import { locations, pallets as palletsApi, products } from "../../lib/api/wms-api";
 import type { Pallet, Product } from "../../types/domain";
 import Screen8 from "./screen8";
 
@@ -28,6 +28,7 @@ vi.mock("../../lib/api/wms-api", () => ({
 		getByItemId: vi.fn(),
 	},
 	locations: {
+		getAll: vi.fn(),
 		resolve: vi.fn(),
 	},
 	warehouses: {
@@ -176,6 +177,12 @@ describe("Screen 8: Put-Away Pallet Assignment", () => {
 			if (id === "prod-1") return Promise.resolve(mockPallets[0].product!);
 			return Promise.reject(new Error("Product not found"));
 		});
+
+		// Mock locations.getAll to return some locations
+		vi.mocked(locations.getAll).mockResolvedValue([
+			{ location_id: "loc-1", type: "RACK", rack: 1, position: "A-1", warehouse_id: "warehouse-1" },
+			{ location_id: "loc-2", type: "RACK", rack: 2, position: "B-1", warehouse_id: "warehouse-1" },
+		]);
 
 		renderScreen();
 

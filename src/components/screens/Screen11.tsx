@@ -197,9 +197,9 @@ export default function Screen11() {
 
 	// Handle back button
 	const handleBack = () => {
-		navigate("/warehouse/pick-pallets", {
-			state: { shippingOrderId },
-		});
+		// Navigate back to pending shipping orders (Screen 9)
+		// This is the correct back navigation for both picking and loading workflows
+		navigate("/warehouse/pending-shipping-orders");
 	};
 
 	if (isLoading) {

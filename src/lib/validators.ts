@@ -36,11 +36,28 @@ export type ProductFormData = z.infer<typeof productSchema>;
  * Receiving order schema
  */
 export const receivingOrderSchema = z.object({
-	container_num: z.string().min(1, "Container number is required"),
+	container_num: z
+		.string()
+		.min(1, "Container number is required")
+		.regex(/^[A-Z]{4}-?\d{7}$/i, "Container number must be 4 letters, 7 numbers (e.g., CONT-1234567)"),
 	seal_num: z.string().min(1, "Seal number is required"),
 });
 
 export type ReceivingOrderFormData = z.infer<typeof receivingOrderSchema>;
+
+/**
+ * Container registration schema
+ */
+export const containerSchema = z.object({
+	container_num: z
+		.string()
+		.min(1, "Container number is required")
+		.min(3, "Container number must be at least 3 characters")
+		.regex(/^[A-Z]{4}-?\d{7}$/i, "Container number must be 4 letters, 7 numbers (e.g., CONT-1234567)"),
+	seal_num: z.string().min(1, "Seal number is required").min(3, "Seal number must be at least 3 characters"),
+});
+
+export type ContainerFormData = z.infer<typeof containerSchema>;
 
 /**
  * Receiving order line schema

@@ -333,7 +333,12 @@ export default function Screen13() {
 
 			// Upload form file
 			const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-			const formPath = `shipping/${shippingOrder.id}/form_${timestamp}_${formFile.name}`;
+			// Sanitize filename to remove spaces and special characters that cause upload errors
+			const sanitizedFormName = formFile.name
+				.replaceAll(/[^a-zA-Z0-9.-]/g, "_") // Replace special chars with underscores
+				.replaceAll(/_{2,}/g, "_") // Replace multiple underscores with single
+				.toLowerCase(); // Convert to lowercase for consistency
+			const formPath = `shipping/${shippingOrder.id}/form_${timestamp}_${sanitizedFormName}`;
 			await storage.upload("shipping", formPath, formFile);
 
 			// Upload photos if provided

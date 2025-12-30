@@ -273,10 +273,13 @@ export default function Screen10() {
 	const handleSelectPallet = async (palletId: string) => {
 		try {
 			setIsSubmitting(true);
-			// Update pallet with shipping_order_id using direct Supabase query
+			// Update pallet with shipping_order_id and status='Staged' using direct Supabase query
 			const { error } = await supabase
 				.from("pallets")
-				.update({ shipping_order_id: shippingOrderId })
+				.update({
+					shipping_order_id: shippingOrderId,
+					status: "Staged", // Move pallet to Staged status when picked
+				})
 				.eq("id", palletId);
 
 			if (error) {
@@ -288,7 +291,7 @@ export default function Screen10() {
 			setPalletRows((prev) => prev.filter((r) => r.palletId !== palletId));
 			setSelectedPallets((prev) => new Set([...prev, palletId]));
 
-			enqueueSnackbar("✅ Pallet selected", { variant: "success" });
+			enqueueSnackbar("✅ Pallet selected and staged", { variant: "success" });
 		} catch (error) {
 			console.error("Error selecting pallet:", error);
 			const message = error instanceof Error ? error.message : "Failed to select pallet";
@@ -312,16 +315,14 @@ export default function Screen10() {
 				status: "Loading",
 			});
 
-			enqueueSnackbar("✅ Picking complete! Navigating to load screen...", { variant: "success" });
+			enqueueSnackbar(`✅ Picking complete! ${selectedPallets.size} pallet(s) staged for loading`, {
+				variant: "success",
+			});
 
-			// Navigate to Screen 11 (Select Load Target)
+			// Navigate back to warehouse dashboard - picking is complete
+			// Loading is a separate process that can be initiated later
 			setTimeout(() => {
-				navigate("/warehouse/select-load-target", {
-					state: {
-						shippingOrderId,
-						message: "Picking complete",
-					},
-				});
+				navigate("/warehouse");
 			}, 1500);
 		} catch (error) {
 			console.error("Error finishing picking:", error);

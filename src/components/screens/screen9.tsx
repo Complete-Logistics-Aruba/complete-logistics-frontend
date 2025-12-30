@@ -1,13 +1,14 @@
 /**
  * Screen 9: Pending Shipping Orders
  *
- * WH user sees list of shipping orders waiting to be picked.
- * Clicks on an order to start the picking workflow.
+ * WH user sees list of shipping orders waiting to be picked or loaded.
+ * Clicks on an order to start the picking workflow (if Pending/Picking)
+ * or loading workflow (if Loading).
  *
  * Story 6.0 Acceptance Criteria:
- * 1. Display shipping orders with status=Pending or Picking
+ * 1. Display shipping orders with status=Pending, Picking, or Loading
  * 2. Show as cards: Order ID, Shipment Type, Status, Items Count
- * 3. Cards are clickable → navigate to Screen 10
+ * 3. Cards are clickable → navigate to appropriate screen
  * 4. Loading state while fetching
  * 5. Empty state if no pending orders
  * 6. Error handling
@@ -69,8 +70,10 @@ export default function Screen9() {
 				// Fetch all shipping orders
 				const allOrders = await shippingOrders.getAll();
 
-				// Filter for Pending or Picking status
-				const pendingOrders = allOrders.filter((order: ShippingOrder) => ["Pending", "Picking"].includes(order.status));
+				// Filter for Pending, Picking, or Loading status
+				const pendingOrders = allOrders.filter((order: ShippingOrder) =>
+					["Pending", "Picking", "Loading"].includes(order.status)
+				);
 
 				// Build card data with item counts
 				const cardData: ShippingOrderCard[] = pendingOrders.map((order: ShippingOrder) => {
@@ -100,10 +103,19 @@ export default function Screen9() {
 		loadOrders();
 	}, [enqueueSnackbar]);
 
-	const handleOrderClick = (orderId: string) => {
-		navigate("/warehouse/pick-pallets", {
-			state: { shippingOrderId: orderId },
-		});
+	const handleOrderClick = (order: ShippingOrderCard) => {
+		// Route based on order status
+		if (order.status === "Loading") {
+			// Go to Screen 11 (Load Target Selection) for loading
+			navigate("/warehouse/select-load-target", {
+				state: { shippingOrderId: order.id },
+			});
+		} else {
+			// Go to Screen 10 (Pick Pallets) for picking
+			navigate("/warehouse/pick-pallets", {
+				state: { shippingOrderId: order.id },
+			});
+		}
 	};
 
 	const handleCloseClearDialog = () => {
@@ -206,7 +218,7 @@ export default function Screen9() {
 						{orders.map((order) => (
 							<Box key={order.id}>
 								<Card
-									onClick={() => handleOrderClick(order.id)}
+									onClick={() => handleOrderClick(order)}
 									sx={{
 										cursor: "pointer",
 										transition: "all 0.3s ease",
@@ -302,7 +314,7 @@ export default function Screen9() {
 												py: { xs: 1, sm: 1.25 },
 											}}
 										>
-											Start Picking →
+											{order.status === "Loading" ? "Start Loading →" : "Start Picking →"}
 										</Button>
 									</CardContent>
 								</Card>

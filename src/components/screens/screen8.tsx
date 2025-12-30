@@ -84,6 +84,8 @@ export default function Screen8() {
 	const [showLocationDialog, setShowLocationDialog] = useState(false);
 	const [locationConflict, setLocationConflict] = useState<string | null>(null);
 	const [warehouseId, setWarehouseId] = useState<string>("");
+	const [_availableLocations, setAvailableLocations] = useState<Location[]>([]);
+	const [rackPositions, setRackPositions] = useState<Record<number, string[]>>({});
 
 	// Tab state (0 = Put-Away, 1 = Move Pallet)
 	const [activeTab, setActiveTab] = useState(0);
@@ -99,11 +101,40 @@ export default function Screen8() {
 				// Fetch default warehouse
 				const warehouse = await warehouses.getDefault();
 				setWarehouseId(warehouse.id);
+
+				// Fetch all locations to build dynamic rack/position mapping
+				const allLocations = await locations.getAll();
+
 				// Fetch pallets with status=Received and shipping_order_id=NULL
 				const receivedPallets = await palletsApi.getFiltered({
 					status: "Received",
 					shipping_order_id: undefined,
 				});
+				setAvailableLocations(allLocations);
+
+				// Build dynamic rack positions mapping
+				const positionsMap: Record<number, string[]> = {};
+				const rackLocations = allLocations.filter((loc) => loc.type === "RACK");
+
+				// Group positions by rack number
+				for (const location of rackLocations) {
+					if (location.rack && location.position) {
+						if (!positionsMap[location.rack]) {
+							positionsMap[location.rack] = [];
+						}
+						if (!positionsMap[location.rack].includes(location.position)) {
+							positionsMap[location.rack].push(location.position);
+						}
+					}
+				}
+
+				// Sort positions alphabetically for each rack
+				for (const rackNum of Object.keys(positionsMap)) {
+					positionsMap[Number(rackNum)].sort();
+				}
+
+				setRackPositions(positionsMap);
+
 				// Enrich pallets with product info
 				const enrichedPallets = await Promise.all(
 					receivedPallets.map(async (pallet) => {
@@ -238,9 +269,15 @@ export default function Screen8() {
 		}));
 	};
 
-	// Check for location conflicts
+	// Check for location conflicts (only for rack locations, not aisle locations)
 	const checkLocationConflict = async (locationId: string): Promise<boolean> => {
 		try {
+			// Skip conflict check for aisle locations since they can hold multiple pallets
+			if (locationId.includes("AISLE")) {
+				setLocationConflict(null);
+				return false;
+			}
+
 			const occupiedPallets = await palletsApi.getFiltered({
 				location_id: locationId,
 			});
@@ -337,6 +374,10 @@ export default function Screen8() {
 	// Handle complete put-away
 	const handleCompletePutAway = () => {
 		enqueueSnackbar("✅ Put-Away completed successfully!", { variant: "success" });
+		// Navigate back to warehouse home after completion
+		setTimeout(() => {
+			navigate("/warehouse");
+		}, 1500);
 	};
 
 	// Handle select pallet for move
@@ -855,10 +896,17 @@ export default function Screen8() {
 							{!locationSelection.isAisle && locationSelection.level && (
 								<Box sx={{ mb: 4, pb: 3, borderBottom: "2px solid #e0e0e0" }}>
 									<Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", color: "#1976d2" }}>
-										Step 4: Select Position (A-T)
+										Step 4: Select Position (
+										{locationSelection.rackNum && rackPositions[locationSelection.rackNum]
+											? rackPositions[locationSelection.rackNum].join("-")
+											: "A-T"}
+										)
 									</Typography>
 									<Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1 }}>
-										{positions.map((pos) => (
+										{(locationSelection.rackNum && rackPositions[locationSelection.rackNum]
+											? rackPositions[locationSelection.rackNum]
+											: positions
+										).map((pos) => (
 											<Button
 												key={pos}
 												variant={locationSelection.position === pos ? "contained" : "outlined"}

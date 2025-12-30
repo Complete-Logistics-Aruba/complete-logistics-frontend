@@ -461,13 +461,16 @@ export default function Screen7() {
 			// Clear pallet rows after successful finish
 			setRows([]);
 
-			// Navigate to Screen 11 if SHIP-NOW was used, otherwise go back
+			// Navigate to Screen 11 if SHIP-NOW was used, otherwise go back to warehouse
 			if (shipNowOrderId) {
 				navigate("/warehouse/select-load-target", {
 					state: {
 						shippingOrderId: shipNowOrderId,
 					},
 				});
+			} else {
+				// Navigate back to warehouse home
+				navigate("/warehouse");
 			}
 		} catch (error) {
 			console.error("❌ [FINISH TALLY] ERROR:", error);
