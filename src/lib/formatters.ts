@@ -35,10 +35,16 @@ export function formatContainerNumber(input: string): string {
 	}
 
 	// If has other format, try to extract numbers
-	const numbers = cleaned.match(/\d{7}/);
+	const numbers = cleaned.match(/\d+/);
 	if (numbers) {
-		const prefix = cleaned.replaceAll(/\d{7}/, "").replaceAll(/[^A-Z-]/g, "") || "CONT";
-		return `${prefix}-${numbers[0]}`;
+		// Take only first 7 digits
+		const sevenDigits = numbers[0].slice(0, 7);
+
+		// Extract letters before the numbers (only keep A-Z)
+		const lettersOnly = cleaned.replaceAll(/\d+/g, "").replaceAll(/[^A-Z]/g, "");
+		const prefix = lettersOnly || "CONT";
+
+		return `${prefix}-${sevenDigits}`;
 	}
 
 	// Fallback: return cleaned version
@@ -58,9 +64,10 @@ export function isValidContainerNumber(containerNumber: string): boolean {
 
 	// Accept standard format: CONT-1234567
 	// Also accept variations: CONT1234567, 1234567, etc.
+	// Accept more than 7 digits (will be truncated to 7)
 	const cleaned = containerNumber.trim().toUpperCase();
 
-	return /^[A-Z]{4}-?\d{7}$/.test(cleaned) || /^\d{7}$/.test(cleaned);
+	return /^[A-Z]{4}-?\d{7,}$/.test(cleaned) || /^\d{7,}$/.test(cleaned);
 }
 
 /**
@@ -69,5 +76,5 @@ export function isValidContainerNumber(containerNumber: string): boolean {
  * @returns Placeholder text showing expected format
  */
 export function getContainerNumberPlaceholder(): string {
-	return "e.g., CONT-1234567";
+	return "e.g., CONT-1234567 (first 7 digits used)";
 }

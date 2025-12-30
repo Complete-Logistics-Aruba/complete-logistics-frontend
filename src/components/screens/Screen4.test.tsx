@@ -16,10 +16,8 @@ import Screen4 from "./Screen4";
 
 // Mock wmsApi
 vi.mock("../../lib/api/wms-api", () => ({
-	default: {
-		manifests: {
-			create: vi.fn(),
-		},
+	manifests: {
+		create: vi.fn(),
 	},
 }));
 

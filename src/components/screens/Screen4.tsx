@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { manifests } from "../../lib/api/wms-api";
 import { formatContainerNumber, getContainerNumberPlaceholder } from "../../lib/formatters";
 import { containerSchema } from "../../lib/validators";
 
@@ -59,8 +60,19 @@ export default function Screen4() {
 	const onSubmit = async (data: ContainerFormData) => {
 		try {
 			setIsSubmitting(true);
+
+			// Create manifest record for the container
+			const newManifest = await manifests.create({
+				type: "Container",
+				container_num: data.container_num,
+				seal_num: data.seal_num,
+				status: "Open",
+			});
+
+			console.log(" Container manifest created:", newManifest);
 			setSuccessData(data);
 			enqueueSnackbar(`✅ Container registered: ${data.container_num}`, { variant: "success" });
+
 			// Redirect after 2 seconds
 			setTimeout(() => {
 				navigate("/warehouse");

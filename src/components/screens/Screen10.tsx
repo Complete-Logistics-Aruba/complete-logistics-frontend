@@ -319,10 +319,9 @@ export default function Screen10() {
 				variant: "success",
 			});
 
-			// Navigate back to warehouse dashboard - picking is complete
-			// Loading is a separate process that can be initiated later
+			// Navigate to pending shipping orders screen
 			setTimeout(() => {
-				navigate("/warehouse");
+				navigate("/warehouse/pending-shipping-orders");
 			}, 1500);
 		} catch (error) {
 			console.error("Error finishing picking:", error);
