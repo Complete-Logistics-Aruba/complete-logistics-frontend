@@ -97,7 +97,7 @@ export default function Screen7() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [editingQty, setEditingQty] = useState<{ [key: string]: number }>({});
 	const [shippingOrders, setShippingOrders] = useState<ShippingOrderWithLines[]>([]);
-	const [shipNowOrderId, setShipNowOrderId] = useState<string | null>(null); // Track if SHIP-NOW was used
+	const [shipNowOrderId, _setShipNowOrderId] = useState<string | null>(null); // Track if SHIP-NOW was used
 	const [totalPalletsCreated, setTotalPalletsCreated] = useState(0);
 	const [confirmingPalletIndex, setConfirmingPalletIndex] = useState<number | null>(null);
 
@@ -383,15 +383,6 @@ export default function Screen7() {
 				is_cross_dock: true,
 			});
 
-			// Track the shipping order ID for navigation after finish tally
-			if (!shipNowOrderId) {
-				setShipNowOrderId(shipNowOrder.id);
-				// Update shipping order status to Loading immediately to prevent it from appearing in Screen 9
-				await shippingOrdersApi.update(shipNowOrder.id, {
-					status: "Loading",
-				});
-			}
-
 			// Remove row from display
 			const updatedRows = rows.filter((_, idx) => idx !== rowIndex);
 			setRows(updatedRows);
@@ -446,30 +437,57 @@ export default function Screen7() {
 				status: "Staged",
 			});
 
-			// Show validation message
-			enqueueSnackbar(
-				`✅ Tally Validation Successful!\n` +
-					`Order: ${receivingOrderId}\n` +
-					`Total Pallets: ${totalPalletsCreated}\n` +
-					`Status: Staged`,
-				{
-					variant: "success",
-					autoHideDuration: 4000,
+			// Check if ALL pallets were created via SHIP-NOW (100% cross-dock)
+			// If there are any regular confirmed pallets, it's a mixed order
+			const hasRegularPallets = rows.some((row) => row.confirmedPallets.length > 0);
+			const isAllShipNow = totalPalletsCreated > 0 && !hasRegularPallets;
+
+			// Only update shipping order to "Loading" if ALL pallets are SHIP-NOW (100% cross-dock)
+			if (shipNowOrderId && isAllShipNow) {
+				try {
+					await shippingOrdersApi.update(shipNowOrderId, {
+						status: "Loading",
+					});
+				} catch (error) {
+					console.error("⚠️ Failed to update shipping order status:", error);
+					// Don't fail the entire operation if shipping order update fails
+					enqueueSnackbar("Warning: Shipping order status update failed, but tally was completed", {
+						variant: "warning",
+					});
 				}
-			);
+			}
+
+			// Show validation message
+			let successMessage =
+				`✅ Tally Validation Successful!\n` +
+				`Order: ${receivingOrderId}\n` +
+				`Total Pallets: ${totalPalletsCreated}\n` +
+				`Status: Staged`;
+
+			if (shipNowOrderId) {
+				successMessage += isAllShipNow
+					? `\nShipping Order: ${shipNowOrderId} (Loading - 100% Cross-Dock)`
+					: `\nShipping Order: ${shipNowOrderId} (Partial - Needs Picking)`;
+			}
+
+			enqueueSnackbar(successMessage, {
+				variant: "success",
+				autoHideDuration: 4000,
+			});
 
 			// Clear pallet rows after successful finish
 			setRows([]);
 
-			// Navigate to Screen 11 if SHIP-NOW was used, otherwise go back to warehouse
-			if (shipNowOrderId) {
+			// Navigate based on fulfillment type
+			if (shipNowOrderId && isAllShipNow) {
+				// 100% cross-dock: Go directly to Screen 11 (Load Target Selection)
 				navigate("/warehouse/select-load-target", {
 					state: {
 						shippingOrderId: shipNowOrderId,
 					},
 				});
 			} else {
-				// Navigate back to warehouse home
+				// Mixed order or regular order: Go to dashboard (user will use Screen 9 to start picking)
 				navigate("/warehouse");
 			}
 		} catch (error) {

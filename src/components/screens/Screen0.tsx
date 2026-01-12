@@ -37,7 +37,6 @@ import { useNavigate } from "react-router-dom";
 
 import { paths } from "@/paths";
 import { wmsApi } from "@/lib/api";
-import { supabase } from "@/lib/auth/supabase-client";
 import { ErrorAlert, FileUpload, LoadingSpinner, SuccessAlert } from "@/components/core";
 
 const downloadTemplate = () => {
@@ -115,66 +114,8 @@ export function Screen0() {
 				active: true,
 			}));
 
-			// Truncate existing products (delete all with cascade)
-			// Skip delete if there are no existing products to improve performance
-			try {
-				// Quick check: count existing products
-				const { error: countError } = await supabase.from("products").select("*", { count: "exact", head: true });
-
-				if (countError) {
-					console.warn("Could not check existing products, skipping delete:", countError.message);
-					// Continue anyway - might be a permissions issue
-				} else {
-					// Helper function to safely delete with timeout
-					const safeDelete = async (table: string) => {
-						try {
-							const result = await Promise.race([
-								supabase.from(table).delete().gte("created_at", "1900-01-01"),
-								new Promise((_, reject) => setTimeout(() => reject(new Error(`Delete timeout for ${table}`)), 15_000)),
-							]);
-							const { error } = result as { error: { code?: string; message?: string } | null };
-
-							if (error) {
-								// Ignore "table not found" errors - it's okay if table doesn't exist
-								if (error.code === "PGRST205" || error.message?.includes("not found")) {
-									console.warn(`Table ${table} not found or empty, continuing...`);
-									return;
-								}
-								throw error;
-							}
-						} catch (error_) {
-							// Ignore table not found errors
-							const message = error_ instanceof Error ? error_.message : String(error_);
-							if (message.includes("not found") || message.includes("PGRST205") || message.includes("timeout")) {
-								console.warn(`Table ${table} delete failed/timed out, continuing...`);
-								return;
-							}
-							throw error_;
-						}
-					};
-
-					// Delete in order (with timeout protection)
-					await safeDelete("receiving_order_lines");
-					await safeDelete("shipping_order_lines");
-					await safeDelete("pallets");
-					await safeDelete("receiving_orders");
-					await safeDelete("shipping_orders");
-					await safeDelete("products");
-				}
-			} catch (error_) {
-				let message = "Unknown error";
-				if (error_ instanceof Error) {
-					message = error_.message;
-				} else if (error_ && typeof error_ === "object" && "message" in error_) {
-					message = String((error_ as unknown as Record<string, unknown>).message);
-				}
-				console.error("Failed to clear existing data:", message);
-				// Don't throw - allow upload to continue even if delete fails
-				console.warn("Continuing with product upload despite delete error...");
-			}
-
-			// Insert new products with retry logic
-			let insertedCount = 0;
+			// Upsert products (update existing, insert new) to prevent foreign key violations
+			let upsertedCount = 0;
 			for (const product of products) {
 				let retries = 0;
 				const maxRetries = 2;
@@ -182,13 +123,30 @@ export function Screen0() {
 
 				while (retries <= maxRetries) {
 					try {
-						await wmsApi.products.create(product);
-						insertedCount++;
+						// Try to update first
+						try {
+							await wmsApi.products.update(product.item_id, product);
+						} catch (updateError) {
+							// If update fails (product doesn't exist), create it
+							if (
+								updateError instanceof Error &&
+								(updateError.message.includes("Failed to update product") ||
+									updateError.message.includes("Cannot coerce the result to a single JSON object") ||
+									updateError.message.includes("Product not found") ||
+									updateError.message.includes("0 rows") ||
+									updateError.message.includes("PGRST116"))
+							) {
+								await wmsApi.products.create(product);
+							} else {
+								throw updateError;
+							}
+						}
+						upsertedCount++;
 						break; // Success, exit retry loop
 					} catch (error_) {
 						lastError = error_ instanceof Error ? error_ : new Error(String(error_));
 						const message = lastError.message;
-						console.error(`Error inserting product ${product.item_id} (attempt ${retries + 1}):`, message);
+						console.error(`Error upserting product ${product.item_id} (attempt ${retries + 1}):`, message);
 
 						if (retries < maxRetries) {
 							// Wait before retrying (exponential backoff)
@@ -198,7 +156,7 @@ export function Screen0() {
 						} else {
 							// Max retries exceeded
 							throw new Error(
-								`Failed to insert product ${product.item_id} after ${maxRetries + 1} attempts: ${message}`
+								`Failed to upsert product ${product.item_id} after ${maxRetries + 1} attempts: ${message}`
 							);
 						}
 					}
@@ -217,11 +175,11 @@ export function Screen0() {
 
 			// Success
 			setSuccess({
-				message: `Product master updated: ${insertedCount} items loaded`,
-				count: insertedCount,
+				message: `Product master updated: ${upsertedCount} items processed`,
+				count: upsertedCount,
 			});
 			setCsvUploaded(true);
-			enqueueSnackbar(`✅ Successfully loaded ${insertedCount} products`, { variant: "success" });
+			enqueueSnackbar(`✅ Successfully processed ${upsertedCount} products`, { variant: "success" });
 		} catch (error_) {
 			const message = error_ instanceof Error ? error_.message : "Failed to upload products";
 			console.error("Upload failed:", error_);

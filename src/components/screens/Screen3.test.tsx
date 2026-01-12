@@ -65,8 +65,10 @@ describe("Screen 3: Shipping Order Creation", () => {
 		renderScreen();
 		const handDeliveryRadio = screen.getByLabelText("Hand Delivery");
 		fireEvent.click(handDeliveryRadio);
+		// Note: Seal field is now only in Screen 4 (Manifest Registration)
+		// Screen 3 only has shipment type and CSV upload
 		await waitFor(() => {
-			expect(screen.getByLabelText("Seal #")).toBeInTheDocument();
+			expect(screen.getByText("Choose CSV File")).toBeInTheDocument();
 		});
 	});
 
@@ -74,8 +76,10 @@ describe("Screen 3: Shipping Order Creation", () => {
 		renderScreen();
 		const containerRadio = screen.getByLabelText("Container Loading");
 		fireEvent.click(containerRadio);
+		// Note: Seal field is now only in Screen 4 (Manifest Registration)
+		// Screen 3 only has shipment type and CSV upload
 		await waitFor(() => {
-			expect(screen.queryByLabelText("Seal #")).not.toBeInTheDocument();
+			expect(screen.getByText("Choose CSV File")).toBeInTheDocument();
 		});
 	});
 

@@ -81,9 +81,10 @@ export interface ShippingOrder {
 	order_ref: string;
 	shipment_type: "Hand_Delivery" | "Container_Loading";
 	seal_num?: string;
-	status: "Pending" | "Picking" | "Loading" | "Completed" | "Shipped";
+	status: "Pending" | "Picking" | "Loading" | "Completed" | "Shipped" | "Cancelled";
 	created_at: string;
 	shipped_at?: string;
+	cancelled_at?: string;
 	lines?: ShippingOrderLine[];
 }
 

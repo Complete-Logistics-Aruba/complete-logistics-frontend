@@ -203,7 +203,14 @@ describe("Screen 10: Picking Workflow", () => {
 			status: "Pending" as const,
 			created_at: "2025-11-26T10:00:00Z",
 			created_by: "user-1",
-			lines: [],
+			lines: [
+				{
+					id: "line-1",
+					shipping_order_id: "order-123",
+					item_id: "prod-1",
+					requested_qty: 100,
+				},
+			],
 		};
 
 		vi.mocked(wmsApi.default.shippingOrders.getById).mockResolvedValue(mockOrder as unknown as typeof mockOrder);
@@ -217,7 +224,7 @@ describe("Screen 10: Picking Workflow", () => {
 			expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 		});
 
-		const finishButton = screen.getByText("Finish Picking");
+		const finishButton = screen.getByRole("button", { name: /Finish Picking/i });
 		expect(finishButton).toBeDisabled();
 	});
 

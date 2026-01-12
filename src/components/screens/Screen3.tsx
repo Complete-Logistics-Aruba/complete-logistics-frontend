@@ -27,7 +27,6 @@ import {
 	FormHelperText,
 	Radio,
 	RadioGroup,
-	TextField,
 	Typography,
 } from "@mui/material";
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
@@ -46,22 +45,8 @@ const shippingOrderSchema = z
 		shipmentType: z.enum(["Hand_Delivery", "Container_Loading"], {
 			errorMap: () => ({ message: "Please select a shipment type" }),
 		}),
-		sealNum: z.string().optional(),
 		csvFile: z.instanceof(File).optional(),
 	})
-	.refine(
-		(data) => {
-			// Seal # required for Hand Delivery
-			if (data.shipmentType === "Hand_Delivery" && !data.sealNum?.trim()) {
-				return false;
-			}
-			return true;
-		},
-		{
-			message: "Seal # is required for Hand Delivery",
-			path: ["sealNum"],
-		}
-	)
 	.refine(
 		(data) => {
 			// CSV file required
@@ -96,19 +81,15 @@ export default function Screen3() {
 	const {
 		control,
 		handleSubmit,
-		watch,
 		formState: { errors },
 		reset,
 	} = useForm<ShippingOrderFormData>({
 		resolver: zodResolver(shippingOrderSchema),
 		defaultValues: {
 			shipmentType: "Hand_Delivery",
-			sealNum: "",
 			csvFile: undefined,
 		},
 	});
-
-	const shipmentType = watch("shipmentType");
 
 	const onSubmit = async (data: ShippingOrderFormData) => {
 		if (!data.csvFile) {
@@ -184,7 +165,6 @@ export default function Screen3() {
 			const shippingOrder = await shippingOrders.create({
 				order_ref: orderRef,
 				shipment_type: data.shipmentType,
-				seal_num: data.shipmentType === "Hand_Delivery" ? data.sealNum : undefined,
 				status: "Pending",
 			});
 
@@ -247,26 +227,6 @@ export default function Screen3() {
 							)}
 						/>
 					</Box>
-
-					{/* Seal # (for Hand Delivery) */}
-					{shipmentType === "Hand_Delivery" && (
-						<Box sx={{ mb: 3 }}>
-							<Controller
-								name="sealNum"
-								control={control}
-								render={({ field }) => (
-									<TextField
-										{...field}
-										label="Seal #"
-										placeholder="e.g., SEAL123"
-										fullWidth
-										error={!!errors.sealNum}
-										helperText={errors.sealNum?.message || "Required for Hand Delivery"}
-									/>
-								)}
-							/>
-						</Box>
-					)}
 
 					{/* CSV Upload */}
 					<Box sx={{ mb: 3 }}>

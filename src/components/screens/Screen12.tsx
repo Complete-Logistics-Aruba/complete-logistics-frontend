@@ -49,6 +49,7 @@ interface PalletRow {
 	description: string;
 	qty: number;
 	palletPositions: number;
+	location: string;
 	isLoaded: boolean;
 	product: Product;
 }
@@ -84,9 +85,9 @@ export default function Screen12() {
 				// Fetch shipping order
 				const order = await shippingOrders.getById(shippingOrderId);
 
-				// Only allow Loading status
-				if (order.status !== "Loading") {
-					enqueueSnackbar("Shipping order is not in Loading status", { variant: "error" });
+				// Allow Loading or Pending status (for hybrid flow support)
+				if (order.status !== "Loading" && order.status !== "Pending") {
+					enqueueSnackbar("Shipping order must be in Loading or Pending status", { variant: "error" });
 					navigate("/warehouse");
 					return;
 				}
@@ -140,12 +141,23 @@ export default function Screen12() {
 							loaded.add(pallet.id);
 						}
 
+						// Format location display
+						let locationDisplay = "";
+						if (pallet.is_cross_dock) {
+							locationDisplay = "📦 Cross-Dock";
+						} else if (pallet.location_id) {
+							locationDisplay = pallet.location_id;
+						} else {
+							locationDisplay = "-";
+						}
+
 						rows.push({
 							palletId: pallet.id,
 							itemId: product.item_id,
 							description: product.description,
 							qty: pallet.qty,
 							palletPositions: product.pallet_positions,
+							location: locationDisplay,
 							isLoaded: pallet.status === "Loaded",
 							product,
 						});
@@ -178,6 +190,10 @@ export default function Screen12() {
 
 			// If container loading and marking as loaded, set manifest_id
 			if (!isCurrentlyLoaded && manifestId && shippingOrder?.shipment_type === "Container_Loading") {
+				updates.manifest_id = manifestId;
+			}
+			// Also assign manifest_id for other shipment types if manifestId exists
+			else if (!isCurrentlyLoaded && manifestId) {
 				updates.manifest_id = manifestId;
 			}
 
@@ -221,9 +237,27 @@ export default function Screen12() {
 				return;
 			}
 
-			// Update shipping order status to Completed
+			// Check if any pallets remain staged for this order (waiting for second truck)
+			const { data: remainingStagedPallets, error: stagedCheckError } = await supabase
+				.from("pallets")
+				.select("id")
+				.eq("shipping_order_id", shippingOrder.id)
+				.eq("status", "Staged");
+
+			if (stagedCheckError) {
+				throw new Error(`Failed to check staged pallets: ${stagedCheckError.message}`);
+			}
+
+			const hasStagedPallets = remainingStagedPallets && remainingStagedPallets.length > 0;
+
+			// Determine final order status
+			// IF staged pallets exist: Keep status='Loading' (open for second truck)
+			// ELSE: Set status='Completed' (all pallets loaded)
+			const finalOrderStatus = hasStagedPallets ? "Loading" : "Completed";
+
+			// Update shipping order status
 			await shippingOrders.update(shippingOrder.id, {
-				status: "Completed",
+				status: finalOrderStatus,
 			});
 
 			// If container loading, update manifest status to Closed
@@ -232,8 +266,13 @@ export default function Screen12() {
 					status: "Closed",
 				});
 			}
-			// Show success message and navigate to home
-			enqueueSnackbar("✅ Loading completed successfully!", {
+
+			// Show appropriate success message
+			const successMessage = hasStagedPallets
+				? "✅ Truck loaded! Order remains open for additional pallets."
+				: "✅ Loading completed successfully!";
+
+			enqueueSnackbar(successMessage, {
 				variant: "success",
 			});
 
@@ -339,6 +378,7 @@ export default function Screen12() {
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									Qty
 								</TableCell>
+								<TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									Pallet Positions
 								</TableCell>
@@ -353,6 +393,14 @@ export default function Screen12() {
 									<TableCell>{row.itemId}</TableCell>
 									<TableCell>{row.description}</TableCell>
 									<TableCell align="right">{row.qty}</TableCell>
+									<TableCell
+										sx={{
+											fontWeight: row.location === "📦 Cross-Dock" ? "bold" : "normal",
+											color: row.location === "📦 Cross-Dock" ? "success.main" : "inherit",
+										}}
+									>
+										{row.location}
+									</TableCell>
 									<TableCell align="right">{row.palletPositions}</TableCell>
 									<TableCell align="center">
 										<Checkbox

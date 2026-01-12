@@ -276,7 +276,7 @@ export function Screen0B() {
 								</TableHead>
 								<TableBody>
 									{paginatedProducts.map((product) => (
-										<TableRow key={product.id} hover>
+										<TableRow key={product.item_id} hover>
 											<TableCell>{product.item_id}</TableCell>
 											<TableCell>
 												{editingCell?.itemId === product.item_id && editingCell?.field === "description" ? (

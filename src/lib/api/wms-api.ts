@@ -478,6 +478,29 @@ export const receivingOrders = {
 			throw new Error(formatErrorMessage(error, "Failed to load receiving orders"));
 		}
 	},
+
+	/**
+	 * Get all receiving orders (alias for list)
+	 *
+	 * @returns Array of receiving orders
+	 * @throws Error with user-friendly message
+	 */
+	async getAll(): Promise<ReceivingOrder[]> {
+		try {
+			const { data, error } = await supabase
+				.from("receiving_orders")
+				.select("*")
+				.order("created_at", { ascending: false });
+
+			if (error) {
+				throw error;
+			}
+
+			return data || [];
+		} catch (error) {
+			throw new Error(formatErrorMessage(error, "Failed to load receiving orders"));
+		}
+	},
 };
 
 /**
@@ -775,6 +798,61 @@ export const shippingOrders = {
 			return data || [];
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Failed to create shipping order lines"));
+		}
+	},
+
+	/**
+	 * Cancel shipping order and release all assigned pallets
+	 *
+	 * This method:
+	 * 1. Sets shipping order status to 'Cancelled'
+	 * 2. Sets cancelled_at timestamp
+	 * 3. Resets all assigned pallets to status='Received' (forcing put-away)
+	 * 4. Clears shipping_order_id from pallets
+	 *
+	 * @param id - Shipping order ID
+	 * @returns Updated shipping order
+	 * @throws Error with user-friendly message
+	 */
+	async cancelOrder(id: string): Promise<ShippingOrder> {
+		try {
+			// Step 1: Update shipping order status to Cancelled
+			const { data: updatedOrder, error: orderError } = await supabase
+				.from("shipping_orders")
+				.update({
+					status: "Cancelled",
+					cancelled_at: new Date().toISOString(),
+				})
+				.eq("id", id)
+				.select()
+				.single();
+
+			if (orderError) {
+				throw orderError;
+			}
+
+			if (!updatedOrder) {
+				throw new Error("Shipping order not found");
+			}
+
+			// Step 2: Release all pallets assigned to this order
+			// Reset status to 'Received' (forces put-away) and clear shipping_order_id
+			const { error: palletError } = await supabase
+				.from("pallets")
+				.update({
+					status: "Received",
+					shipping_order_id: null,
+					manifest_id: null,
+				})
+				.eq("shipping_order_id", id);
+
+			if (palletError) {
+				console.error("❌ [CANCEL ORDER] Failed to release pallets:", palletError);
+				throw new Error("Failed to release pallets");
+			}
+			return updatedOrder;
+		} catch (error) {
+			throw new Error(formatErrorMessage(error, "Failed to cancel shipping order"));
 		}
 	},
 };
@@ -1163,6 +1241,26 @@ export const manifests = {
 			return data;
 		} catch (error) {
 			throw new Error(formatErrorMessage(error, "Failed to load manifest"));
+		}
+	},
+
+	/**
+	 * Get all manifests
+	 *
+	 * @returns Array of all manifests
+	 * @throws Error with user-friendly message
+	 */
+	async getAll(): Promise<Manifest[]> {
+		try {
+			const { data, error } = await supabase.from("manifests").select("*").order("created_at", { ascending: false });
+
+			if (error) {
+				throw error;
+			}
+
+			return data || [];
+		} catch (error) {
+			throw new Error(formatErrorMessage(error, "Failed to load manifests"));
 		}
 	},
 

@@ -57,7 +57,7 @@ describe("Screen 4: Empty Container Registration", () => {
 	it("should display header", () => {
 		renderScreen();
 
-		expect(screen.getByText(/Register Empty Container/i)).toBeInTheDocument();
+		expect(screen.getByText(/Register Manifest/i)).toBeInTheDocument();
 	});
 
 	it("should have submit button disabled initially", () => {

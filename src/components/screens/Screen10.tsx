@@ -35,6 +35,7 @@ import {
 	TextField,
 	Typography,
 } from "@mui/material";
+import { ArrowClockwiseIcon } from "@phosphor-icons/react/dist/ssr/ArrowClockwise";
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useSnackbar } from "notistack";
@@ -51,6 +52,7 @@ interface PalletRow {
 	location: string;
 	qty: number;
 	rackNumber?: number;
+	shippingOrderId?: string;
 }
 
 export default function Screen10() {
@@ -70,7 +72,15 @@ export default function Screen10() {
 	const [textFilter, setTextFilter] = useState("");
 	const [selectedRack, setSelectedRack] = useState<number | null>(null);
 
+	// Summary state for Requested vs Remaining (Safety Net)
+	const [totalRequested, setTotalRequested] = useState(0);
+	const [totalRemaining, setTotalRemaining] = useState(0);
+	const [crossDockQty, setCrossDockQty] = useState(0);
+	const [pickedQty, setPickedQty] = useState(0);
+
 	// Load shipping order and available pallets
+	const [refreshKey, setRefreshKey] = useState(0);
+
 	useEffect(() => {
 		const loadData = async () => {
 			try {
@@ -116,20 +126,24 @@ export default function Screen10() {
 				const allPallets = [...storedPallets, ...stagedPallets];
 
 				// Filter for pallets that are available for this order:
-				// 1. Have no shipping_order_id (normal pallets not yet assigned), OR
-				// 2. Already have this shipping_order_id (already picked for this order)
+				// 1. Have no shipping_order_id (normal pallets not yet assigned)
+				// 2. EXCLUDE pallets already assigned to this order (already picked)
+				// 3. EXCLUDE pallets assigned to other orders
 				// NOTE: Cross-dock pallets (is_cross_dock=true) are EXCLUDED from picking
 				// They skip put-away AND picking, going directly to loading (Screen 12)
 				const availablePallets = allPallets.filter((p) => {
 					// EXCLUDE cross-dock pallets - they bypass picking
 					if (p.is_cross_dock) return false;
 
+					// EXCLUDE pallets already assigned to THIS order - they're already picked
+					if (p.shipping_order_id === shippingOrderId) {
+						return false;
+					}
+
 					// If pallet has no shipping_order_id, it's available for any order
 					if (!p.shipping_order_id) return true;
 
-					// If pallet is already assigned to this order, include it
-					if (p.shipping_order_id === shippingOrderId) return true;
-
+					// Pallet is assigned to a different order - exclude it
 					return false;
 				});
 
@@ -142,12 +156,22 @@ export default function Screen10() {
 					itemQtyMap.set(line.item_id, line.requested_qty);
 				}
 
-				// Calculate picked qty per item
+				// Calculate picked qty per item and cross-dock qty
 				const pickedQtyMap = new Map<string, number>();
+				let totalCrossDock = 0;
+				let totalPicked = 0;
+
 				for (const pallet of allPallets) {
 					if (pallet.shipping_order_id === shippingOrderId) {
 						const current = pickedQtyMap.get(pallet.item_id) || 0;
 						pickedQtyMap.set(pallet.item_id, current + pallet.qty);
+
+						// Track cross-dock vs picked separately
+						if (pallet.is_cross_dock) {
+							totalCrossDock += pallet.qty;
+						} else {
+							totalPicked += pallet.qty;
+						}
 					}
 				}
 
@@ -227,11 +251,26 @@ export default function Screen10() {
 							location: locationStr,
 							qty: pallet.qty,
 							rackNumber,
+							shippingOrderId: pallet.shipping_order_id,
 						});
 					}
 				}
 
 				setPalletRows(rows);
+
+				// Calculate summary: Total Requested vs Total Remaining (Safety Net)
+				let requested = 0;
+				let remaining = 0;
+				for (const line of order.lines || []) {
+					const picked = pickedQtyMap.get(line.item_id) || 0;
+					const itemRemaining = line.requested_qty - picked;
+					requested += line.requested_qty;
+					remaining += Math.max(0, itemRemaining); // Don't count negative
+				}
+				setTotalRequested(requested);
+				setTotalRemaining(remaining);
+				setCrossDockQty(totalCrossDock);
+				setPickedQty(totalPicked);
 			} catch (error) {
 				console.error("Error loading data:", error);
 				const message = error instanceof Error ? error.message : "Failed to load data";
@@ -242,7 +281,19 @@ export default function Screen10() {
 		};
 
 		loadData();
-	}, [shippingOrderId, navigate, enqueueSnackbar]);
+	}, [shippingOrderId, navigate, enqueueSnackbar, refreshKey]);
+
+	// Auto-refresh when page becomes visible (e.g., navigating back from Screen 8)
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "visible" && shippingOrderId) {
+				setRefreshKey((prev) => prev + 1);
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+	}, [shippingOrderId]);
 
 	// Compute filtered pallets based on text and rack filters
 	const filteredPalletRows = useMemo(() => {
@@ -273,6 +324,14 @@ export default function Screen10() {
 	const handleSelectPallet = async (palletId: string) => {
 		try {
 			setIsSubmitting(true);
+
+			// If this is the first pallet being picked, update order status to 'Picking'
+			if (selectedPallets.size === 0) {
+				await shippingOrders.update(shippingOrderId, {
+					status: "Picking",
+				});
+			}
+
 			// Update pallet with shipping_order_id and status='Staged' using direct Supabase query
 			const { error } = await supabase
 				.from("pallets")
@@ -292,6 +351,9 @@ export default function Screen10() {
 			setSelectedPallets((prev) => new Set([...prev, palletId]));
 
 			enqueueSnackbar("✅ Pallet selected and staged", { variant: "success" });
+
+			// Refresh data to update header calculations
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			console.error("Error selecting pallet:", error);
 			const message = error instanceof Error ? error.message : "Failed to select pallet";
@@ -302,8 +364,11 @@ export default function Screen10() {
 	};
 
 	const handleFinishPicking = async () => {
-		if (selectedPallets.size === 0) {
-			enqueueSnackbar("Please select at least one pallet", { variant: "warning" });
+		// Safety Net Logic: Allow finishing if:
+		// 1. At least one pallet was picked manually, OR
+		// 2. RemainingQty <= 0 (100% fulfilled via cross-dock or hybrid)
+		if (selectedPallets.size === 0 && totalRemaining > 0) {
+			enqueueSnackbar("Please select at least one pallet or wait for cross-dock fulfillment", { variant: "warning" });
 			return;
 		}
 
@@ -315,7 +380,12 @@ export default function Screen10() {
 				status: "Loading",
 			});
 
-			enqueueSnackbar(`✅ Picking complete! ${selectedPallets.size} pallet(s) staged for loading`, {
+			const message =
+				selectedPallets.size > 0
+					? `✅ Picking complete! ${selectedPallets.size} pallet(s) staged for loading`
+					: "✅ Order 100% fulfilled via cross-dock! Ready for loading";
+
+			enqueueSnackbar(message, {
 				variant: "success",
 			});
 
@@ -358,6 +428,14 @@ export default function Screen10() {
 				<Typography variant="h4" sx={{ flex: 1, fontWeight: "bold" }}>
 					🎯 Pick Pallets
 				</Typography>
+				<Button
+					startIcon={<ArrowClockwiseIcon size={20} />}
+					onClick={() => setRefreshKey((prev) => prev + 1)}
+					disabled={isLoading}
+					sx={{ ml: 2 }}
+				>
+					Refresh
+				</Button>
 			</Box>
 
 			{/* Order Info */}
@@ -389,6 +467,49 @@ export default function Screen10() {
 							<Typography variant="h6">{selectedPallets.size}</Typography>
 						</Box>
 					</Box>
+				</CardContent>
+			</Card>
+
+			{/* Header Summary: Requested vs Remaining (Safety Net) */}
+			<Card sx={{ mb: 3, backgroundColor: totalRemaining === 0 ? "#e8f5e9" : "#fff3e0" }}>
+				<CardContent>
+					<Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+						📊 Order Summary (Safety Net)
+					</Typography>
+					<Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
+						<Box>
+							<Typography color="textSecondary" variant="body2">
+								Total Requested
+							</Typography>
+							<Typography variant="h5" sx={{ fontWeight: "bold" }}>
+								{totalRequested} units
+							</Typography>
+						</Box>
+						<Box>
+							<Typography color="textSecondary" variant="body2">
+								Total Remaining
+							</Typography>
+							<Typography
+								variant="h5"
+								sx={{ fontWeight: "bold", color: totalRemaining === 0 ? "success.main" : "warning.main" }}
+							>
+								{totalRemaining} units
+							</Typography>
+						</Box>
+						<Box>
+							<Typography color="textSecondary" variant="body2">
+								Allocated
+							</Typography>
+							<Typography variant="h5" sx={{ fontWeight: "bold", color: "success.main" }}>
+								{totalRequested - totalRemaining} units ({crossDockQty} Cross-Dock + {pickedQty} Picked)
+							</Typography>
+						</Box>
+					</Box>
+					{totalRemaining === 0 && (
+						<Alert severity="success" sx={{ mt: 2 }}>
+							✅ Order 100% fulfilled! No picking required. Click &quot;Finish Picking&quot; to proceed to loading.
+						</Alert>
+					)}
 				</CardContent>
 			</Card>
 
@@ -526,10 +647,16 @@ export default function Screen10() {
 					color="success"
 					startIcon={<CheckCircleIcon size={20} />}
 					onClick={handleFinishPicking}
-					disabled={selectedPallets.size === 0 || isSubmitting}
+					disabled={(selectedPallets.size === 0 && totalRemaining > 0) || isSubmitting}
 					size="large"
 				>
-					{isSubmitting ? <CircularProgress size={24} /> : "Finish Picking"}
+					{isSubmitting ? (
+						<CircularProgress size={24} />
+					) : totalRemaining === 0 ? (
+						"Finish Picking (Cross-Dock Complete)"
+					) : (
+						"Finish Picking"
+					)}
 				</Button>
 			</Box>
 

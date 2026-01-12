@@ -45,6 +45,7 @@
 		"@mui/material": "7.1.1",
 		"@mui/system": "7.1.1",
 		"@mui/utils": "7.1.1",
+		"@mui/x-data-grid": "^8.24.0",
 		"@mui/x-date-pickers": "8.5.1",
 		"@phosphor-icons/react": "2.1.10",
 		"@react-pdf/renderer": "4.3.0",

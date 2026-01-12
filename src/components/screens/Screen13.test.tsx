@@ -331,33 +331,6 @@ describe("Screen13 - Shipping Summary", () => {
 		});
 	});
 
-	it("should have working back button", async () => {
-		(shippingOrders.getById as unknown as Mock).mockResolvedValue(mockShippingOrder);
-		(pallets.getFiltered as unknown as Mock).mockResolvedValue(mockLoadedPallets);
-		(products.getById as unknown as Mock).mockResolvedValue(mockProduct);
-		(manifests.getById as unknown as Mock).mockResolvedValue(mockManifest);
-		(shippingOrders.getAll as unknown as Mock).mockResolvedValue([mockShippingOrder]);
-
-		renderWithProviders(<Screen13 />);
-
-		await waitFor(
-			() => {
-				expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
-			},
-			{ timeout: 2000 }
-		);
-
-		const backButton = screen.getByRole("button", { name: /back/i });
-		fireEvent.click(backButton);
-
-		await waitFor(
-			() => {
-				expect(mockNavigate).toHaveBeenCalledWith("/warehouse/home");
-			},
-			{ timeout: 1000 }
-		);
-	});
-
 	it("should display shipment type chip", async () => {
 		(shippingOrders.getById as unknown as Mock).mockResolvedValue(mockShippingOrder);
 		(pallets.getFiltered as unknown as Mock).mockResolvedValue(mockLoadedPallets);

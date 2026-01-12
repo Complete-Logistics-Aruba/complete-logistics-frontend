@@ -31,10 +31,12 @@ import {
 	Typography,
 } from "@mui/material";
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+import { XCircleIcon } from "@phosphor-icons/react/dist/ssr/XCircle";
 import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 
 import { shippingOrders } from "../../lib/api/wms-api";
+import { supabase } from "../../lib/auth/supabase-client";
 import type { ShippingOrder } from "../../types/domain";
 
 interface ShippingOrderCard {
@@ -59,6 +61,9 @@ export default function Screen9() {
 	const [error, setError] = useState<string | null>(null);
 	const [clearDialogOpen, setClearDialogOpen] = useState(false);
 	const [isClearing] = useState(false);
+	const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+	const [orderToCancel, setOrderToCancel] = useState<ShippingOrderCard | null>(null);
+	const [isCancelling, setIsCancelling] = useState(false);
 
 	// Load pending shipping orders
 	useEffect(() => {
@@ -103,23 +108,118 @@ export default function Screen9() {
 		loadOrders();
 	}, [enqueueSnackbar]);
 
-	const handleOrderClick = (order: ShippingOrderCard) => {
-		// Route based on order status
-		if (order.status === "Loading") {
-			// Go to Screen 11 (Load Target Selection) for loading
-			navigate("/warehouse/select-load-target", {
-				state: { shippingOrderId: order.id },
-			});
-		} else {
-			// Go to Screen 10 (Pick Pallets) for picking
-			navigate("/warehouse/pick-pallets", {
-				state: { shippingOrderId: order.id },
-			});
+	const handleOrderClick = async (order: ShippingOrderCard) => {
+		// Smart Skip Logic: Check RemainingQty to determine if picking is needed
+		try {
+			// Get order lines to calculate requested quantities
+			const { data: orderLines, error: linesError } = await supabase
+				.from("shipping_order_lines")
+				.select("item_id, requested_qty")
+				.eq("shipping_order_id", order.id);
+
+			if (linesError) throw linesError;
+
+			// Get all pallets assigned to this order to calculate picked quantities
+			const { data: assignedPallets, error: palletsError } = await supabase
+				.from("pallets")
+				.select("item_id, qty")
+				.eq("shipping_order_id", order.id);
+
+			if (palletsError) throw palletsError;
+
+			// Calculate total requested vs total picked
+			const requestedMap = new Map();
+			const pickedMap = new Map();
+
+			// Build requested quantities map
+			for (const line of orderLines || []) {
+				requestedMap.set(line.item_id, line.requested_qty);
+			}
+
+			// Build picked quantities map
+			for (const pallet of assignedPallets || []) {
+				const current = pickedMap.get(pallet.item_id) || 0;
+				pickedMap.set(pallet.item_id, current + pallet.qty);
+			}
+
+			// Calculate remaining quantity
+			let totalRequested = 0;
+			let totalPicked = 0;
+
+			for (const [itemId, requested] of requestedMap) {
+				const picked = pickedMap.get(itemId) || 0;
+				totalRequested += requested;
+				totalPicked += Math.min(picked, requested); // Don't count over-picks
+			}
+
+			const remainingQty = totalRequested - totalPicked;
+
+			// Smart Skip Logic: If RemainingQty <= 0, skip picking
+			if (order.status === "Loading" || remainingQty <= 0) {
+				// Go to Screen 11 (Load Target Selection) for loading
+				navigate("/warehouse/select-load-target", {
+					state: { shippingOrderId: order.id },
+				});
+			} else {
+				// Go to Screen 10 (Pick Pallets) for picking
+				navigate("/warehouse/pick-pallets", {
+					state: { shippingOrderId: order.id },
+				});
+			}
+		} catch (error) {
+			console.error("Error calculating remaining quantity:", error);
+			// Fallback to status-based routing
+			if (order.status === "Loading") {
+				navigate("/warehouse/select-load-target", {
+					state: { shippingOrderId: order.id },
+				});
+			} else {
+				navigate("/warehouse/pick-pallets", {
+					state: { shippingOrderId: order.id },
+				});
+			}
 		}
 	};
 
 	const handleCloseClearDialog = () => {
 		setClearDialogOpen(false);
+	};
+
+	const handleOpenCancelDialog = (order: ShippingOrderCard, event: React.MouseEvent) => {
+		event.stopPropagation(); // Prevent card click navigation
+		setOrderToCancel(order);
+		setCancelDialogOpen(true);
+	};
+
+	const handleCloseCancelDialog = () => {
+		setCancelDialogOpen(false);
+		setOrderToCancel(null);
+	};
+
+	const handleConfirmCancel = async () => {
+		if (!orderToCancel) return;
+
+		try {
+			setIsCancelling(true);
+
+			// Call API to cancel order and release pallets
+			await shippingOrders.cancelOrder(orderToCancel.id);
+
+			enqueueSnackbar(`Order ${orderToCancel.order_ref} cancelled successfully. Pallets released for put-away.`, {
+				variant: "success",
+			});
+
+			// Remove cancelled order from list
+			setOrders((prev) => prev.filter((o) => o.id !== orderToCancel.id));
+
+			handleCloseCancelDialog();
+		} catch (error_) {
+			console.error("Error cancelling order:", error_);
+			const message = error_ instanceof Error ? error_.message : "Failed to cancel order";
+			enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+		} finally {
+			setIsCancelling(false);
+		}
 	};
 
 	if (isLoading) {
@@ -153,7 +253,7 @@ export default function Screen9() {
 						minWidth: "200px",
 					}}
 				>
-					📋 Pending Shipping Orders
+					📋 Active Shipping Orders
 				</Typography>
 			</Box>
 
@@ -179,10 +279,10 @@ export default function Screen9() {
 								fontSize: { xs: "1rem", sm: "1.25rem" },
 							}}
 						>
-							No Pending Orders
+							No Active Orders
 						</Typography>
 						<Typography variant="body2" color="textSecondary" sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
-							All shipping orders have been picked or there are no orders waiting.
+							All shipping orders have been completed or there are no active orders.
 						</Typography>
 					</CardContent>
 				</Card>
@@ -198,7 +298,7 @@ export default function Screen9() {
 								fontSize: { xs: "0.875rem", sm: "1rem" },
 							}}
 						>
-							{orders.length} order{orders.length === 1 ? "" : "s"} waiting to be picked
+							{orders.length} active order{orders.length === 1 ? "" : "s"}
 						</Typography>
 					)}
 
@@ -259,7 +359,15 @@ export default function Screen9() {
 										<Box sx={{ mb: 2 }}>
 											<Chip
 												label={order.status}
-												color={order.status === "Pending" ? "warning" : "info"}
+												color={
+													order.status === "Pending"
+														? "warning"
+														: order.status === "Picking"
+															? "info"
+															: order.status === "Loading"
+																? "secondary"
+																: "default"
+												}
 												size="small"
 												variant="outlined"
 												sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
@@ -316,6 +424,23 @@ export default function Screen9() {
 										>
 											{order.status === "Loading" ? "Start Loading →" : "Start Picking →"}
 										</Button>
+
+										{/* Cancel Order Button */}
+										<Button
+											fullWidth
+											variant="outlined"
+											color="error"
+											size="small"
+											startIcon={<XCircleIcon size={16} />}
+											onClick={(e) => handleOpenCancelDialog(order, e)}
+											sx={{
+												mt: 1,
+												fontSize: { xs: "0.75rem", sm: "0.8rem", md: "0.875rem" },
+												py: { xs: 0.75, sm: 1 },
+											}}
+										>
+											Cancel Order
+										</Button>
 									</CardContent>
 								</Card>
 							</Box>
@@ -341,6 +466,33 @@ export default function Screen9() {
 				<DialogActions>
 					<Button onClick={handleCloseClearDialog} disabled={isClearing}>
 						Cancel
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Cancel Order Confirmation Dialog */}
+			<Dialog
+				open={cancelDialogOpen}
+				onClose={handleCloseCancelDialog}
+				aria-labelledby="cancel-dialog-title"
+				aria-describedby="cancel-dialog-description"
+			>
+				<DialogTitle id="cancel-dialog-title">Cancel Order {orderToCancel?.order_ref}?</DialogTitle>
+				<DialogContent>
+					<DialogContentText id="cancel-dialog-description">
+						This will cancel the shipping order and release all assigned pallets back to inventory (status = Received).
+						The pallets will need to be put away again.
+						<br />
+						<br />
+						<strong>This action cannot be undone.</strong>
+					</DialogContentText>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={handleCloseCancelDialog} disabled={isCancelling}>
+						No, Keep Order
+					</Button>
+					<Button onClick={handleConfirmCancel} disabled={isCancelling} color="error" variant="contained">
+						{isCancelling ? <CircularProgress size={20} /> : "Yes, Cancel Order"}
 					</Button>
 				</DialogActions>
 			</Dialog>

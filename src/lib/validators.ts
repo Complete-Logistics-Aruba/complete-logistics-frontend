@@ -46,16 +46,28 @@ export const receivingOrderSchema = z.object({
 export type ReceivingOrderFormData = z.infer<typeof receivingOrderSchema>;
 
 /**
- * Container registration schema
+ * Container registration schema (supports both Container and Hand Delivery manifests)
  */
-export const containerSchema = z.object({
-	container_num: z
-		.string()
-		.min(1, "Container number is required")
-		.min(3, "Container number must be at least 3 characters")
-		.regex(/^[A-Z]{4}-?\d{7}$/i, "Container number must be 4 letters, 7 numbers (e.g., CONT-1234567)"),
-	seal_num: z.string().min(1, "Seal number is required").min(3, "Seal number must be at least 3 characters"),
-});
+export const containerSchema = z
+	.object({
+		manifest_type: z.enum(["Container", "Hand"], {
+			errorMap: () => ({ message: "Please select a manifest type" }),
+		}),
+		container_num: z.string().optional(),
+		seal_num: z.string().min(1, "Seal number is required").min(3, "Seal number must be at least 3 characters"),
+	})
+	.refine(
+		(data) => {
+			if (data.manifest_type === "Container") {
+				return data.container_num && data.container_num.length >= 3 && /^[A-Z]{4}-?\d{7}$/i.test(data.container_num);
+			}
+			return true; // Hand Delivery doesn't need container number
+		},
+		{
+			message: "Container number must be 4 letters, 7 numbers (e.g., CONT-1234567)",
+			path: ["container_num"],
+		}
+	);
 
 export type ContainerFormData = z.infer<typeof containerSchema>;
 
@@ -75,7 +87,6 @@ export type ReceivingOrderLineFormData = z.infer<typeof receivingOrderLineSchema
 export const shippingOrderSchema = z.object({
 	order_ref: z.string().min(1, "Order reference is required"),
 	shipment_type: z.enum(["Hand_Delivery", "Container_Loading"]),
-	seal_num: z.string().optional(),
 });
 
 export type ShippingOrderFormData = z.infer<typeof shippingOrderSchema>;

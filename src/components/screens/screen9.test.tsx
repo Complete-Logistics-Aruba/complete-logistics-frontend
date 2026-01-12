@@ -69,7 +69,7 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		// Wait for loading to complete
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
-		expect(screen.getByText(/Pending Shipping Orders/i)).toBeInTheDocument();
+		expect(screen.getByText(/Active Shipping Orders/i)).toBeInTheDocument();
 	});
 
 	it("should display empty state when no orders", async () => {
@@ -80,7 +80,7 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		// Wait for loading to complete
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
-		expect(screen.getByText(/No Pending Orders/i)).toBeInTheDocument();
+		expect(screen.getByRole("heading", { name: /No Active Orders/i })).toBeInTheDocument();
 	});
 
 	it("should display order cards", async () => {
@@ -130,7 +130,7 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		// Wait for loading to complete
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
-		expect(screen.getByText(/2 orders waiting to be picked/i)).toBeInTheDocument();
+		expect(screen.getByText(/2 active orders/i)).toBeInTheDocument();
 	});
 
 	it("should filter for Pending, Picking, and Loading status", async () => {
