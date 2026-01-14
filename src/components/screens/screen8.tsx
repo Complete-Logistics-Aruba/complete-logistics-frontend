@@ -135,35 +135,47 @@ export default function Screen8() {
 
 				setRackPositions(positionsMap);
 
-				// Enrich pallets with product info
-				const enrichedPallets = await Promise.all(
-					receivedPallets.map(async (pallet) => {
+				// Get unique item IDs from both received and stored pallets
+				const allPallets = [...receivedPallets];
+				const uniqueItemIds = [...new Set(allPallets.map((p) => p.item_id))];
+
+				// Batch fetch all products at once
+				const allProducts = await Promise.all(
+					uniqueItemIds.map(async (itemId) => {
 						try {
-							const product = await products.getByItemId(pallet.item_id);
-							return { ...pallet, product };
+							return await products.getByItemId(itemId);
 						} catch {
-							return pallet;
+							return null;
 						}
 					})
 				);
 
+				// Create product lookup map
+				const productMap = new Map();
+				for (const product of allProducts) {
+					if (product) {
+						productMap.set(product.item_id, product);
+					}
+				}
+
+				// Enrich pallets with product info using the map
+				const enrichedPallets = receivedPallets.map((pallet) => ({
+					...pallet,
+					product: productMap.get(pallet.item_id),
+				}));
+
 				setPallets(enrichedPallets);
+
 				// Fetch stored pallets for Move Pallet tab
 				const stored = await palletsApi.getFiltered({
 					status: "Stored",
 				});
 
-				// Enrich stored pallets with product info
-				const enrichedStoredPallets = await Promise.all(
-					stored.map(async (pallet) => {
-						try {
-							const product = await products.getByItemId(pallet.item_id);
-							return { ...pallet, product };
-						} catch {
-							return pallet;
-						}
-					})
-				);
+				// Enrich stored pallets with product info using the same map
+				const enrichedStoredPallets = stored.map((pallet) => ({
+					...pallet,
+					product: productMap.get(pallet.item_id),
+				}));
 
 				setStoredPallets(enrichedStoredPallets);
 
@@ -188,21 +200,16 @@ export default function Screen8() {
 		if (activeTab === 1) {
 			const refreshStoredPallets = async () => {
 				try {
+					// Don't show loading spinner for tab switching (just update data)
 					const stored = await palletsApi.getFiltered({
 						status: "Stored",
 					});
 
-					// Enrich stored pallets with product info
-					const enrichedStoredPallets = await Promise.all(
-						stored.map(async (pallet) => {
-							try {
-								const product = await products.getByItemId(pallet.item_id);
-								return { ...pallet, product };
-							} catch {
-								return pallet;
-							}
-						})
-					);
+					// Use existing product data to enrich stored pallets (no additional API calls)
+					const enrichedStoredPallets = stored.map((pallet) => {
+						const product = pallets.find((p) => p.item_id === pallet.item_id)?.product;
+						return { ...pallet, product };
+					});
 
 					setStoredPallets(enrichedStoredPallets);
 				} catch (error) {
@@ -214,7 +221,7 @@ export default function Screen8() {
 
 			refreshStoredPallets();
 		}
-	}, [activeTab, enqueueSnackbar]);
+	}, [activeTab, enqueueSnackbar, pallets]);
 
 	// Handle location selection dialog
 	const handleSelectPallet = (pallet: PalletWithProduct) => {

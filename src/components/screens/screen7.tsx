@@ -97,7 +97,7 @@ export default function Screen7() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [editingQty, setEditingQty] = useState<{ [key: string]: number }>({});
 	const [shippingOrders, setShippingOrders] = useState<ShippingOrderWithLines[]>([]);
-	const [shipNowOrderId, _setShipNowOrderId] = useState<string | null>(null); // Track if SHIP-NOW was used
+	const [shipNowOrderId, setShipNowOrderId] = useState<string | null>(null); // Track if SHIP-NOW was used
 	const [totalPalletsCreated, setTotalPalletsCreated] = useState(0);
 	const [confirmingPalletIndex, setConfirmingPalletIndex] = useState<number | null>(null);
 
@@ -381,7 +381,11 @@ export default function Screen7() {
 				status: "Staged",
 				shipping_order_id: shipNowOrder.id,
 				is_cross_dock: true,
+				received_at: new Date().toISOString(), // Set received_at for cross-dock pallets
 			});
+
+			// Track the shipping order ID for navigation logic
+			setShipNowOrderId(shipNowOrder.id);
 
 			// Remove row from display
 			const updatedRows = rows.filter((_, idx) => idx !== rowIndex);

@@ -338,6 +338,7 @@ export default function Screen10() {
 				.update({
 					shipping_order_id: shippingOrderId,
 					status: "Staged", // Move pallet to Staged status when picked
+					location_id: null, // Clear location when moving to Staged
 				})
 				.eq("id", palletId);
 
@@ -346,14 +347,21 @@ export default function Screen10() {
 				throw error;
 			}
 
+			// Get the pallet being selected to update summary calculations
+			const selectedPallet = palletRows.find((r) => r.palletId === palletId);
+
 			// Remove from list
 			setPalletRows((prev) => prev.filter((r) => r.palletId !== palletId));
 			setSelectedPallets((prev) => new Set([...prev, palletId]));
 
-			enqueueSnackbar("✅ Pallet selected and staged", { variant: "success" });
+			// Update summary calculations locally (avoid full page reload)
+			if (selectedPallet) {
+				setPickedQty((prev) => prev + selectedPallet.qty);
+				// Remaining qty decreases as we pick pallets
+				setTotalRemaining((prev) => Math.max(0, prev - selectedPallet.qty));
+			}
 
-			// Refresh data to update header calculations
-			setRefreshKey((prev) => prev + 1);
+			enqueueSnackbar("✅ Pallet selected and staged", { variant: "success" });
 		} catch (error) {
 			console.error("Error selecting pallet:", error);
 			const message = error instanceof Error ? error.message : "Failed to select pallet";
@@ -650,13 +658,7 @@ export default function Screen10() {
 					disabled={(selectedPallets.size === 0 && totalRemaining > 0) || isSubmitting}
 					size="large"
 				>
-					{isSubmitting ? (
-						<CircularProgress size={24} />
-					) : totalRemaining === 0 ? (
-						"Finish Picking (Cross-Dock Complete)"
-					) : (
-						"Finish Picking"
-					)}
+					{isSubmitting ? <CircularProgress size={24} /> : totalRemaining === 0 ? "Finish Picking" : "Finish Picking"}
 				</Button>
 			</Box>
 

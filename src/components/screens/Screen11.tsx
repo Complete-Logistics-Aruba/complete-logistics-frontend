@@ -31,7 +31,6 @@ import {
 	Typography,
 } from "@mui/material";
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
-import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -51,6 +50,8 @@ export default function Screen11() {
 	const [shippingOrder, setShippingOrder] = useState<ShippingOrder | null>(null);
 	const [manifests, setManifests] = useState<Manifest[]>([]);
 	const [error, setError] = useState<string | null>(null);
+	const [availableOrders, setAvailableOrders] = useState<ShippingOrder[]>([]);
+	const [showOrderSelection, setShowOrderSelection] = useState(false);
 
 	// Load shipping order and manifests
 	useEffect(() => {
@@ -60,8 +61,12 @@ export default function Screen11() {
 				setError(null);
 
 				if (!shippingOrderId) {
-					enqueueSnackbar("No shipping order selected", { variant: "error" });
-					navigate("/warehouse");
+					// No order ID provided - show order selection interface
+					const allOrders = await shippingOrders.getAll();
+					const loadingOrders = allOrders.filter((order) => order.status === "Loading");
+					setAvailableOrders(loadingOrders);
+					setShowOrderSelection(true);
+					setIsLoading(false);
 					return;
 				}
 
@@ -131,48 +136,6 @@ export default function Screen11() {
 		loadData();
 	}, [shippingOrderId, navigate, enqueueSnackbar]);
 
-	// Handle Create New Manifest for Hand Delivery
-	const handleStartLoading = async () => {
-		if (!shippingOrder) return;
-
-		try {
-			setIsSubmitting(true);
-
-			// Generate trip reference for seal_num (TRIP-YYYY-###)
-			const year = new Date().getFullYear();
-			const randomNum = Math.floor(Math.random() * 1000)
-				.toString()
-				.padStart(3, "0");
-			const tripRef = `TRIP-${year}-${randomNum}`;
-
-			// Create new Hand Delivery manifest
-			const newManifest = await manifestsApi.create({
-				type: "Hand",
-				seal_num: tripRef,
-				status: "Open",
-			});
-
-			enqueueSnackbar(`✅ Created new Hand Delivery Trip`, { variant: "success" });
-
-			// Navigate to Screen 12 with manifest info
-			navigate("/warehouse/load-pallets", {
-				state: {
-					shippingOrderId: shippingOrder.id,
-					manifestId: newManifest.id,
-					shipmentType: shippingOrder.shipment_type,
-					orderRef: shippingOrder.order_ref,
-					sealNum: shippingOrder.seal_num,
-				},
-			});
-		} catch (error_) {
-			console.error("❌ [SCREEN 11] Error creating manifest:", error_);
-			const message = error_ instanceof Error ? error_.message : "Failed to create manifest";
-			enqueueSnackbar(message, { variant: "error" });
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
 	// Handle manifest selection for Container Loading
 	const handleSelectManifest = async (manifest: Manifest) => {
 		if (!shippingOrder) return;
@@ -195,17 +158,93 @@ export default function Screen11() {
 		}
 	};
 
+	// Handle order selection
+	const handleSelectOrder = (order: ShippingOrder) => {
+		setShippingOrder(order);
+		setShowOrderSelection(false);
+		// Reload with the selected order
+		navigate("/warehouse/select-load-target", {
+			state: { shippingOrderId: order.id },
+			replace: true,
+		});
+	};
+
 	// Handle back button
 	const handleBack = () => {
-		// Navigate back to pending shipping orders (Screen 9)
-		// This is the correct back navigation for both picking and loading workflows
-		navigate("/warehouse/pending-shipping-orders");
+		if (showOrderSelection) {
+			navigate("/warehouse");
+		} else {
+			// Navigate back to pending shipping orders (Screen 9)
+			navigate("/warehouse/pending-shipping-orders");
+		}
 	};
 
 	if (isLoading) {
 		return (
 			<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
 				<CircularProgress />
+			</Box>
+		);
+	}
+
+	// Show order selection interface if no order selected
+	if (showOrderSelection) {
+		return (
+			<Box sx={{ p: 3 }}>
+				<Box sx={{ mb: 3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+					<Typography variant="h5" sx={{ fontWeight: 600 }}>
+						Select Shipping Order for Loading
+					</Typography>
+					<Button startIcon={<ArrowLeftIcon />} onClick={handleBack} variant="outlined">
+						Back
+					</Button>
+				</Box>
+
+				{availableOrders.length === 0 ? (
+					<Alert severity="info">No shipping orders in Loading status. Please complete picking first.</Alert>
+				) : (
+					<Box
+						sx={{
+							display: "grid",
+							gridTemplateColumns: {
+								xs: "1fr",
+								sm: "repeat(2, 1fr)",
+								md: "repeat(3, 1fr)",
+							},
+							gap: 2,
+						}}
+					>
+						{availableOrders.map((order) => (
+							<Card
+								key={order.id}
+								sx={{
+									cursor: "pointer",
+									transition: "all 0.2s",
+									"&:hover": {
+										boxShadow: 4,
+										transform: "translateY(-4px)",
+									},
+								}}
+								onClick={() => handleSelectOrder(order)}
+							>
+								<CardContent>
+									<Typography variant="h6" sx={{ mb: 1 }}>
+										{order.order_ref}
+									</Typography>
+									<Chip label={order.status} color="secondary" size="small" variant="outlined" sx={{ mb: 1 }} />
+									<Typography variant="body2" color="textSecondary">
+										<strong>Type:</strong> {order.shipment_type.replace("_", " ")}
+									</Typography>
+									{order.seal_num && (
+										<Typography variant="body2" color="textSecondary">
+											<strong>Seal:</strong> {order.seal_num}
+										</Typography>
+									)}
+								</CardContent>
+							</Card>
+						))}
+					</Box>
+				)}
 			</Box>
 		);
 	}
@@ -273,8 +312,8 @@ export default function Screen11() {
 					</Typography>
 
 					{manifests.length === 0 ? (
-						<Alert severity="info" sx={{ mb: 3 }}>
-							No open hand delivery trips available. Create a new one to get started.
+						<Alert severity="warning" sx={{ mb: 3 }}>
+							No open hand delivery trips available. Please contact Customer Service to create a new manifest.
 						</Alert>
 					) : (
 						<TableContainer component={Paper} sx={{ mb: 3 }}>
@@ -313,17 +352,6 @@ export default function Screen11() {
 							</Table>
 						</TableContainer>
 					)}
-
-					<Button
-						variant="contained"
-						size="large"
-						startIcon={<CheckCircleIcon />}
-						onClick={handleStartLoading}
-						disabled={isSubmitting}
-						fullWidth
-					>
-						{isSubmitting ? <CircularProgress size={24} /> : "Create New Manifest"}
-					</Button>
 				</Box>
 			)}
 

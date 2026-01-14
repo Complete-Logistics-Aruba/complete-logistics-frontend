@@ -29,6 +29,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { ReceivingOrder } from "@/types/domain";
 import { paths } from "@/paths";
 import { wmsApi } from "@/lib/api";
+import { supabase } from "@/lib/auth/supabase-client";
 import { PhotoCapture } from "@/components/core";
 
 interface LocationState {
@@ -81,6 +82,23 @@ export const Screen6: React.FC = () => {
 	const [photos, setPhotos] = useState<Record<number, PhotoState>>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	// Check if photos already exist for an order
+	const checkExistingPhotos = useCallback(async (orderId: string) => {
+		if (!orderId) return [];
+		try {
+			const { data, error } = await supabase.storage.from("receiving").list(orderId);
+			if (error) throw error;
+			// Filter for photo files (photo_*.jpg)
+			const photoFiles = (data || []).filter(
+				(file: { name: string }) => file.name.startsWith("photo_") && file.name.endsWith(".jpg")
+			);
+			return photoFiles.map((file: { name: string }) => file.name);
+		} catch (error) {
+			console.error("Error checking existing photos:", error);
+			return [];
+		}
+	}, []);
+
 	// Load all pending receiving orders on mount
 	useEffect(() => {
 		const loadOrders = async () => {
@@ -108,18 +126,50 @@ export const Screen6: React.FC = () => {
 			setReceivingOrderId(locationState.receivingOrderId);
 			setContainerNum(locationState.containerNum);
 			setSealNum(locationState.sealNum);
+			// Check if photos already exist for this order
+			checkExistingPhotos(locationState.receivingOrderId).then((existing) => {
+				if (existing.length >= 3) {
+					enqueueSnackbar("Photos already uploaded for this order. Proceeding to tally...", { variant: "info" });
+					setTimeout(() => {
+						navigate(paths.warehouseScreens.screen7, {
+							state: {
+								receivingOrderId: locationState.receivingOrderId,
+								containerNum: locationState.containerNum,
+								sealNum: locationState.sealNum,
+							},
+						});
+					}, 1500);
+				}
+			});
 		} else {
 			loadOrders();
 		}
-	}, [locationState, enqueueSnackbar]);
+	}, [locationState, enqueueSnackbar, checkExistingPhotos, navigate]);
 
 	// Handle order selection from list
-	const handleSelectOrder = (order: ReceivingOrder) => {
+	const handleSelectOrder = async (order: ReceivingOrder) => {
 		setSelectedOrder(order);
 		setReceivingOrderId(order.id);
 		setContainerNum(order.container_num);
 		setSealNum(order.seal_num);
 		setPhotos({}); // Reset photos for new order
+
+		// Check if photos already exist
+		const existing = await checkExistingPhotos(order.id);
+
+		// If 3+ photos exist, skip to next screen
+		if (existing.length >= 3) {
+			enqueueSnackbar("Photos already uploaded for this order. Proceeding to tally...", { variant: "info" });
+			setTimeout(() => {
+				navigate(paths.warehouseScreens.screen7, {
+					state: {
+						receivingOrderId: order.id,
+						containerNum: order.container_num,
+						sealNum: order.seal_num,
+					},
+				});
+			}, 1500);
+		}
 	};
 
 	// Handle back from photo upload to orders list

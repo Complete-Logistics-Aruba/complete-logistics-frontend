@@ -48,9 +48,10 @@ export default function Screen5() {
 				// Fetch all receiving orders
 				const allOrders = await receivingOrders.list();
 
-				// Filter for pending orders that haven't been processed yet
-				// Only show orders with status 'Pending' (awaiting container photos)
-				const pendingOrders = allOrders.filter((order) => order.status === "Pending");
+				// Filter for pending and unloading orders (show both statuses)
+				// Pending: Created by CSE, awaiting warehouse processing
+				// Unloading: WH has started processing, may need to continue
+				const pendingOrders = allOrders.filter((order) => order.status === "Pending" || order.status === "Unloading");
 
 				// For each order, count the items
 				const receiptsWithCounts: PendingReceipt[] = [];

@@ -118,7 +118,11 @@ export default function Screen15() {
 					receivedDate: pallet.received_at || null,
 					outboundRef: shippingOrder?.order_ref || null,
 					shipType: shippingOrder?.shipment_type || null,
-					outboundManifest: manifest?.container_num || null,
+					outboundManifest: manifest
+						? manifest.type === "Container"
+							? manifest.container_num || null
+							: manifest.id.slice(-8) // Show manifest ID for Hand manifests
+						: null,
 					outboundSeal: manifest?.seal_num || null,
 					shippedDate: pallet.shipped_at || null,
 				};

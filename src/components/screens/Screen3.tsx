@@ -109,13 +109,31 @@ export default function Screen3() {
 
 			// Parse CSV (skip header)
 			for (let i = 1; i < csvLines.length; i++) {
-				const [itemId, qtyStr] = csvLines[i].split(",").map((s) => s.trim());
+				const columns = csvLines[i].split(",").map((s) => s.trim());
+
+				// Support both 2-column (item_id, qty) and 3-column (item_id, description, qty) formats
+				let itemId: string, qtyStr: string;
+
+				if (columns.length === 2) {
+					// Format: item_id, qty
+					[itemId, qtyStr] = columns;
+				} else if (columns.length === 3) {
+					// Format: item_id, description, qty
+					[itemId, , qtyStr] = columns;
+				} else {
+					validationErrors.push({
+						row: i + 1,
+						field: "format",
+						message: "Expected 2 or 3 columns: item_id, [description], qty",
+					});
+					continue;
+				}
 
 				if (!itemId || !qtyStr) {
 					validationErrors.push({
 						row: i + 1,
 						field: "item_id/qty_ordered",
-						message: "Missing required fields",
+						message: "Missing required fields (item_id and qty are required)",
 					});
 					continue;
 				}

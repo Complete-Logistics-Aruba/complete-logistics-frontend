@@ -117,16 +117,24 @@ describe("Screen11 - Load Target Selection", () => {
 		expect(screen.getByRole("progressbar")).toBeInTheDocument();
 	});
 
-	it("should display hand delivery info with Create New Manifest button", async () => {
+	it("should display hand delivery info with warning message (no Create New Manifest button)", async () => {
 		(shippingOrders.getById as Mock).mockResolvedValue(mockShippingOrderHandDelivery);
+		(manifestsApi.getFiltered as Mock).mockResolvedValue([]); // No manifests available
 
 		renderWithProviders(<Screen11 />);
 
 		await waitFor(() => {
 			expect(screen.getByText("ORD-001")).toBeInTheDocument();
 			expect(screen.getByText("SEAL-123")).toBeInTheDocument();
-			expect(screen.getByRole("button", { name: /create new manifest/i })).toBeInTheDocument();
+			expect(
+				screen.getByText(
+					"No open hand delivery trips available. Please contact Customer Service to create a new manifest."
+				)
+			).toBeInTheDocument();
 		});
+
+		// Verify Create New Manifest button is NOT present
+		expect(screen.queryByRole("button", { name: /create new manifest/i })).not.toBeInTheDocument();
 	});
 
 	it("should display container manifest list for Container Loading", async () => {
@@ -144,18 +152,35 @@ describe("Screen11 - Load Target Selection", () => {
 		);
 	});
 
-	it("should navigate to Screen 12 on Create New Manifest click", async () => {
+	it("should display hand delivery manifest list when manifests are available", async () => {
 		(shippingOrders.getById as Mock).mockResolvedValue(mockShippingOrderHandDelivery);
+
+		const mockHandDeliveryManifests: Manifest[] = [
+			{
+				id: "hand-manifest-001",
+				type: "Hand",
+				seal_num: "SEAL-HAND-001",
+				status: "Open",
+				created_at: "2025-11-26T09:00:00Z",
+			},
+		];
+
+		(manifestsApi.getFiltered as Mock).mockResolvedValue(mockHandDeliveryManifests);
 
 		renderWithProviders(<Screen11 />);
 
-		// Verify component renders
-		await waitFor(
-			() => {
-				expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-			},
-			{ timeout: 1000 }
-		);
+		await waitFor(() => {
+			expect(screen.getByText("ORD-001")).toBeInTheDocument();
+			expect(screen.getByText("SEAL-123")).toBeInTheDocument();
+			expect(screen.getByText("hand-man")).toBeInTheDocument(); // First 8 chars of manifest ID
+		});
+
+		// Verify warning message is NOT present when manifests exist
+		expect(
+			screen.queryByText(
+				"No open hand delivery trips available. Please contact Customer Service to create a new manifest."
+			)
+		).not.toBeInTheDocument();
 	});
 
 	it("should navigate to Screen 12 on manifest selection", async () => {

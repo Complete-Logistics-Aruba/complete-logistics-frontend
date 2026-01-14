@@ -176,6 +176,17 @@ const createNavItems = () => {
 						href: paths.warehouseScreens.screen10,
 						icon: "hand",
 					},
+					{
+						key: "screen-11",
+						title: "Load Target Selection",
+						href: paths.warehouseScreens.screen11,
+						icon: "target",
+					},
+					{
+						key: "screen-12",
+						title: "Load Pallets",
+						href: paths.warehouseScreens.screen12,
+					},
 				],
 			},
 			{
@@ -219,6 +230,18 @@ const createNavItems = () => {
 						title: "Pick Pallets",
 						href: paths.warehouseScreens.screen10,
 						icon: "hand",
+					},
+					{
+						key: "screen-11-admin",
+						title: "Load Target Selection",
+						href: paths.warehouseScreens.screen11,
+						icon: "target",
+					},
+					{
+						key: "screen-12-admin",
+						title: "Load Pallets",
+						href: paths.warehouseScreens.screen12,
+						icon: "truck",
 					},
 				],
 			}

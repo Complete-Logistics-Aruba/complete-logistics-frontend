@@ -41,7 +41,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { manifests, pallets, products, shippingOrders } from "../../lib/api/wms-api";
 import { supabase } from "../../lib/auth/supabase-client";
-import type { Manifest, Product, ShippingOrder } from "../../types/domain";
+import type { Product, ShippingOrder } from "../../types/domain";
 
 interface PalletRow {
 	palletId: string;
@@ -49,7 +49,6 @@ interface PalletRow {
 	description: string;
 	qty: number;
 	palletPositions: number;
-	location: string;
 	isLoaded: boolean;
 	product: Product;
 }
@@ -64,7 +63,6 @@ export default function Screen12() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [shippingOrder, setShippingOrder] = useState<ShippingOrder | null>(null);
-	const [manifest, setManifest] = useState<Manifest | null>(null);
 	const [palletRows, setPalletRows] = useState<PalletRow[]>([]);
 	const [loadedPalletIds, setLoadedPalletIds] = useState<Set<string>>(new Set());
 	const [error, setError] = useState<string | null>(null);
@@ -94,12 +92,6 @@ export default function Screen12() {
 
 				setShippingOrder(order);
 
-				// If container loading, fetch and set manifest
-				if (manifestId && order.shipment_type === "Container_Loading") {
-					const containerManifest = await manifests.getById(manifestId);
-					setManifest(containerManifest);
-				}
-
 				// Fetch pallets for this shipping order with Stored, Received, or Staged status
 				const { data: storedPalletsData, error: storedError } = await supabase
 					.from("pallets")
@@ -127,37 +119,48 @@ export default function Screen12() {
 
 				const allPallets = [...storedPallets, ...receivedPallets, ...stagedPallets];
 
-				// Build pallet rows with product and pallet positions info
+				// Build pallet rows
+				// Get unique item IDs for batch fetching
+				const uniqueItemIds = [...new Set(allPallets.map((p) => p.item_id))];
+
+				// Batch fetch all products
+				const allProducts = await Promise.all(
+					uniqueItemIds.map(async (itemId) => {
+						try {
+							return await products.getByItemId(itemId);
+						} catch {
+							return null;
+						}
+					})
+				);
+
+				// Create product lookup map
+				const productMap = new Map();
+				for (const product of allProducts) {
+					if (product) {
+						productMap.set(product.item_id, product);
+					}
+				}
+
 				const rows: PalletRow[] = [];
 				const loaded = new Set<string>();
 
 				for (const pallet of allPallets) {
 					try {
 						// Fetch product
-						const product = await products.getByItemId(pallet.item_id);
+						const product = productMap.get(pallet.item_id);
 
 						// Check if pallet is already loaded
 						if (pallet.status === "Loaded") {
 							loaded.add(pallet.id);
 						}
 
-						// Format location display
-						let locationDisplay = "";
-						if (pallet.is_cross_dock) {
-							locationDisplay = "📦 Cross-Dock";
-						} else if (pallet.location_id) {
-							locationDisplay = pallet.location_id;
-						} else {
-							locationDisplay = "-";
-						}
-
 						rows.push({
 							palletId: pallet.id,
-							itemId: product.item_id,
-							description: product.description,
+							itemId: product?.item_id,
+							description: product?.description,
 							qty: pallet.qty,
 							palletPositions: product.pallet_positions,
-							location: locationDisplay,
 							isLoaded: pallet.status === "Loaded",
 							product,
 						});
@@ -197,9 +200,10 @@ export default function Screen12() {
 				updates.manifest_id = manifestId;
 			}
 
-			// If unchecking, remove manifest_id
+			// If unchecking, remove manifest_id and clear location
 			if (isCurrentlyLoaded) {
 				updates.manifest_id = null;
+				updates.location_id = null; // Clear location when moving back to Staged
 			}
 
 			await pallets.update(palletId, updates);
@@ -260,8 +264,8 @@ export default function Screen12() {
 				status: finalOrderStatus,
 			});
 
-			// If container loading, update manifest status to Closed
-			if (manifestId && manifest) {
+			// Update manifest status to Closed for both Hand Delivery and Container Loading
+			if (manifestId) {
 				await manifests.update(manifestId, {
 					status: "Closed",
 				});
@@ -378,7 +382,6 @@ export default function Screen12() {
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									Qty
 								</TableCell>
-								<TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
 									Pallet Positions
 								</TableCell>
@@ -393,14 +396,6 @@ export default function Screen12() {
 									<TableCell>{row.itemId}</TableCell>
 									<TableCell>{row.description}</TableCell>
 									<TableCell align="right">{row.qty}</TableCell>
-									<TableCell
-										sx={{
-											fontWeight: row.location === "📦 Cross-Dock" ? "bold" : "normal",
-											color: row.location === "📦 Cross-Dock" ? "success.main" : "inherit",
-										}}
-									>
-										{row.location}
-									</TableCell>
 									<TableCell align="right">{row.palletPositions}</TableCell>
 									<TableCell align="center">
 										<Checkbox

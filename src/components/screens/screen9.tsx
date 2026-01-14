@@ -154,8 +154,18 @@ export default function Screen9() {
 
 			const remainingQty = totalRequested - totalPicked;
 
-			// Smart Skip Logic: If RemainingQty <= 0, skip picking
+			// Smart Skip Logic: If RemainingQty <= 0, skip picking and go to loading
 			if (order.status === "Loading" || remainingQty <= 0) {
+				// Update order status to Loading if not already (for fully cross-docked orders)
+				if (order.status !== "Loading") {
+					await shippingOrders.update(order.id, { status: "Loading" });
+
+					// Update local state to reflect the change
+					setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: "Loading" } : o)));
+
+					enqueueSnackbar("Order fully cross-docked. Proceeding to loading.", { variant: "info" });
+				}
+
 				// Go to Screen 11 (Load Target Selection) for loading
 				navigate("/warehouse/select-load-target", {
 					state: { shippingOrderId: order.id },
