@@ -22,7 +22,7 @@ export const paths = {
 		screen10: "/warehouse/pick-pallets",
 		screen11: "/warehouse/select-load-target",
 		screen12: "/warehouse/load-pallets",
-		screen13: "/warehouse/shipping-summary",
+		screen13: "/warehouse/manifest",
 		screen14: "/warehouse/billing-report",
 		screen15: "/warehouse/inventory-adjustments",
 	},

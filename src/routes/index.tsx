@@ -137,7 +137,7 @@ export const routes: RouteObject[] = [
 				),
 			},
 			{
-				path: "shipping-summary",
+				path: "manifest",
 				element: React.createElement(
 					React.lazy(() => import("@/components/screens/Screen13").then((module) => ({ default: module.default })))
 				),
