@@ -160,7 +160,7 @@ export default function Screen4() {
 						render={({ field }) => (
 							<RadioGroup {...field} row>
 								<FormControlLabel value="Container" control={<Radio />} label="Container" />
-								<FormControlLabel value="Hand" control={<Radio />} label="Hand Delivery" />
+								<FormControlLabel value="Hand_Delivery" control={<Radio />} label="Hand Delivery" />
 							</RadioGroup>
 						)}
 					/>

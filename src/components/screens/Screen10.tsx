@@ -67,6 +67,7 @@ export default function Screen10() {
 	const [shippingOrder, setShippingOrder] = useState<ShippingOrder | null>(null);
 	const [palletRows, setPalletRows] = useState<PalletRow[]>([]);
 	const [selectedPallets, setSelectedPallets] = useState<Set<string>>(new Set());
+	const [selectedPalletDetails, setSelectedPalletDetails] = useState<PalletRow[]>([]);
 
 	// Filter state
 	const [textFilter, setTextFilter] = useState("");
@@ -325,6 +326,37 @@ export default function Screen10() {
 		try {
 			setIsSubmitting(true);
 
+			// Get the pallet being selected to validate quantity
+			const selectedPallet = palletRows.find((r) => r.palletId === palletId);
+			if (!selectedPallet) {
+				throw new Error("Pallet not found");
+			}
+
+			// CRITICAL VALIDATION: Prevent over-picking (picking more than ordered)
+			// Calculate total already picked for this item
+			const alreadyPickedForItem = selectedPalletDetails
+				.filter((p) => p.itemId === selectedPallet.itemId)
+				.reduce((sum, p) => sum + p.qty, 0);
+
+			// Get requested qty for this item from shipping order lines
+			const orderLine = shippingOrder?.lines?.find((l) => l.item_id === selectedPallet.itemId);
+			if (!orderLine) {
+				throw new Error("Order line not found for this item");
+			}
+
+			const requestedQty = orderLine.requested_qty;
+			const newTotal = alreadyPickedForItem + selectedPallet.qty;
+
+			if (newTotal > requestedQty) {
+				const remaining = requestedQty - alreadyPickedForItem;
+				enqueueSnackbar(
+					`Cannot pick: Total qty (${newTotal}) would exceed ordered qty (${requestedQty}). Only ${remaining} units remaining for ${selectedPallet.itemId}.`,
+					{ variant: "error" }
+				);
+				setIsSubmitting(false);
+				return;
+			}
+
 			// If this is the first pallet being picked, update order status to 'Picking'
 			if (selectedPallets.size === 0) {
 				await shippingOrders.update(shippingOrderId, {
@@ -347,12 +379,12 @@ export default function Screen10() {
 				throw error;
 			}
 
-			// Get the pallet being selected to update summary calculations
-			const selectedPallet = palletRows.find((r) => r.palletId === palletId);
-
-			// Remove from list
+			// Remove from list and add to selected details
 			setPalletRows((prev) => prev.filter((r) => r.palletId !== palletId));
 			setSelectedPallets((prev) => new Set([...prev, palletId]));
+			if (selectedPallet) {
+				setSelectedPalletDetails((prev) => [...prev, selectedPallet]);
+			}
 
 			// Update summary calculations locally (avoid full page reload)
 			if (selectedPallet) {
@@ -365,6 +397,108 @@ export default function Screen10() {
 		} catch (error) {
 			console.error("Error selecting pallet:", error);
 			const message = error instanceof Error ? error.message : "Failed to select pallet";
+			enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleDeselectPallet = async (palletId: string) => {
+		try {
+			setIsSubmitting(true);
+
+			// Update pallet to remove shipping_order_id and set status back to 'Stored'
+			const { error } = await supabase
+				.from("pallets")
+				.update({
+					shipping_order_id: null,
+					status: "Stored", // Move pallet back to Stored status when deselected
+				})
+				.eq("id", palletId);
+
+			if (error) {
+				console.error("❌ [DESELECT PALLET] Error updating pallet:", error);
+				throw error;
+			}
+
+			// Get the pallet being deselected to restore it to the list
+			// We need to fetch the pallet details to restore it
+			const { data: palletData, error: fetchError } = await supabase
+				.from("pallets")
+				.select(
+					`
+					id,
+					item_id,
+					qty,
+					location_id,
+					products (
+						description
+					)
+				`
+				)
+				.eq("id", palletId)
+				.single();
+
+			if (fetchError) {
+				console.error("Error fetching pallet data:", fetchError);
+				throw fetchError;
+			}
+
+			// Remove from selected set and details
+			setSelectedPallets((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(palletId);
+				return newSet;
+			});
+			setSelectedPalletDetails((prev) => prev.filter((p) => p.palletId !== palletId));
+
+			// Restore pallet to the list
+			if (palletData) {
+				let locationStr = "N/A";
+				let rackNumber: number | undefined;
+
+				if (palletData.location_id) {
+					try {
+						const { data: locationData, error: locError } = await supabase
+							.from("locations")
+							.select("*")
+							.eq("location_id", palletData.location_id)
+							.single();
+
+						if (!locError && locationData) {
+							locationStr = locationData.location_id || "N/A";
+							const rackMatch = locationStr.match(/W1-(\d+)-/);
+							if (rackMatch) {
+								rackNumber = Number.parseInt(rackMatch[1], 10);
+							}
+						}
+					} catch (error) {
+						console.error(`Error fetching location for pallet ${palletData.id}:`, error);
+					}
+				}
+
+				const restoredPallet: PalletRow = {
+					palletId: palletData.id,
+					itemId: palletData.item_id,
+					description:
+						(Array.isArray(palletData.products) && palletData.products[0]?.description) || palletData.item_id,
+					location: locationStr || "N/A",
+					qty: palletData.qty,
+					rackNumber,
+					shippingOrderId: undefined,
+				};
+
+				setPalletRows((prev) => [...prev, restoredPallet]);
+
+				// Update summary calculations
+				setPickedQty((prev) => Math.max(0, prev - palletData.qty));
+				setTotalRemaining((prev) => prev + palletData.qty);
+			}
+
+			enqueueSnackbar("✅ Pallet deselected and returned to storage", { variant: "success" });
+		} catch (error) {
+			console.error("Error deselecting pallet:", error);
+			const message = error instanceof Error ? error.message : "Failed to deselect pallet";
 			enqueueSnackbar(`Error: ${message}`, { variant: "error" });
 		} finally {
 			setIsSubmitting(false);
@@ -646,6 +780,49 @@ export default function Screen10() {
 						</TableBody>
 					</Table>
 				</TableContainer>
+			)}
+
+			{/* Selected Pallets Section */}
+			{selectedPalletDetails.length > 0 && (
+				<Card sx={{ mb: 3 }}>
+					<CardContent>
+						<Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", color: "success.main" }}>
+							✅ Selected Pallets ({selectedPalletDetails.length})
+						</Typography>
+						<TableContainer component={Paper} variant="outlined">
+							<Table size="small">
+								<TableHead sx={{ backgroundColor: "#f8f9fa" }}>
+									<TableRow>
+										<TableCell>Item ID</TableCell>
+										<TableCell>Description</TableCell>
+										<TableCell>Qty</TableCell>
+										<TableCell align="center">Action</TableCell>
+									</TableRow>
+								</TableHead>
+								<TableBody>
+									{selectedPalletDetails.map((row) => (
+										<TableRow key={row.palletId} hover sx={{ backgroundColor: "#f0f8f0" }}>
+											<TableCell sx={{ fontWeight: "bold" }}>{row.itemId}</TableCell>
+											<TableCell>{row.description}</TableCell>
+											<TableCell>{row.qty}</TableCell>
+											<TableCell align="center">
+												<Button
+													size="small"
+													variant="outlined"
+													color="error"
+													onClick={() => handleDeselectPallet(row.palletId)}
+													disabled={isSubmitting}
+												>
+													Deselect
+												</Button>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</TableContainer>
+					</CardContent>
+				</Card>
 			)}
 
 			{/* Actions */}

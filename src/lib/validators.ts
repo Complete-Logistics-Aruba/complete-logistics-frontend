@@ -50,7 +50,7 @@ export type ReceivingOrderFormData = z.infer<typeof receivingOrderSchema>;
  */
 export const containerSchema = z
 	.object({
-		manifest_type: z.enum(["Container", "Hand"], {
+		manifest_type: z.enum(["Container", "Hand_Delivery"], {
 			errorMap: () => ({ message: "Please select a manifest type" }),
 		}),
 		container_num: z.string().optional(),

@@ -1,18 +1,17 @@
 /* eslint-disable unicorn/filename-case */
 /**
- * Screen 13: Shipping Summary & Docs (Phase 1 Spec)
+ * Screen 13: Manifests (Grid View)
  *
- * Customer Service user reviews manifest and uploads documentation.
- * Displays loaded items with real pallet data.
- * Allows download of loading summary CSV and upload of signed form + photos.
+ * Customer Service user views all manifests (trucks/trips) in a data grid.
+ * Shows ALL manifests including Open ones to enable finalization.
+ * Each row represents one Manifest (truck/trip), not an Order.
  *
- * Phase 1 Spec - Exact Requirements:
- * 1. Header: Manifest Ref, Type, Container #, Seal #, Status
- * 2. Loaded Items Table: Item ID, Description, Qty (from loaded pallets)
- * 3. Download Loading Summary CSV button
- * 4. Upload Signed Customer Form (mandatory)
- * 5. Upload Loading Photos (optional)
- * 6. Close Manifest & Send Email button
+ * Columns:
+ * - Manifest Ref (ID or seal number)
+ * - Type (Hand_Delivery / Container)
+ * - Status (Open / Closed)
+ * - Total Pallets (count of loaded pallets)
+ * - Actions (View Details button)
  */
 
 import React, { useEffect, useState } from "react";
@@ -42,15 +41,26 @@ import {
 import { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { DownloadIcon } from "@phosphor-icons/react/dist/ssr/Download";
+import { EyeIcon } from "@phosphor-icons/react/dist/ssr/Eye";
 import { XCircleIcon } from "@phosphor-icons/react/dist/ssr/XCircle";
 import { useSnackbar } from "notistack";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import { manifests, pallets, products, shippingOrders, storage } from "../../lib/api/wms-api";
+import { manifests, pallets, products, storage } from "../../lib/api/wms-api";
 import { useAuth } from "../../lib/auth/auth-context";
 import { supabase } from "../../lib/auth/supabase-client";
-import type { Manifest, Product, ShippingOrder } from "../../types/domain";
+import type { Manifest, Product } from "../../types/domain";
 import { sendShippingEmail } from "../../utils/shipping-email";
+
+interface ManifestRow {
+	id: string;
+	manifestRef: string;
+	type: "Hand_Delivery" | "Hand" | "Container";
+	status: "Open" | "Closed" | "Cancelled";
+	totalPallets: number;
+	containerNum?: string;
+	sealNum?: string;
+}
 
 interface LoadedItem {
 	itemId: string;
@@ -59,29 +69,29 @@ interface LoadedItem {
 	palletCount: number;
 }
 
+// Helper function to check if manifest is Hand Delivery (handles both "Hand" and "Hand_Delivery")
+const isHandDelivery = (type: string): boolean => {
+	return type === "Hand" || type === "Hand_Delivery";
+};
+
 export default function Screen13() {
-	const location = useLocation();
 	const navigate = useNavigate();
 	const { enqueueSnackbar } = useSnackbar();
 	const { user } = useAuth();
 
-	const { shippingOrderId, manifestId } = location.state || {};
-
-	// State
-	const [completedOrders, setCompletedOrders] = useState<ShippingOrder[]>([]);
-	const [loadingOrders, setLoadingOrders] = useState(false);
-	const [showOrderList, setShowOrderList] = useState(!shippingOrderId);
-	const [selectedOrderId, setSelectedOrderId] = useState<string | null>(shippingOrderId || null);
-	const [loadingOrderId, setLoadingOrderId] = useState<string | null>(null);
-
+	// State - Grid view
+	const [manifestRows, setManifestRows] = useState<ManifestRow[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [shippingOrder, setShippingOrder] = useState<ShippingOrder | null>(null);
-	const [manifest, setManifest] = useState<Manifest | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	// State - Detail view
+	const [selectedManifestId, setSelectedManifestId] = useState<string | null>(null);
+	const [manifestDetail, setManifestDetail] = useState<Manifest | null>(null);
 	const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
+	const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 	const [formFile, setFormFile] = useState<File | null>(null);
 	const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-	const [error, setError] = useState<string | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isFinalized, setIsFinalized] = useState(false);
 	const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 	const [isCancelling, setIsCancelling] = useState(false);
@@ -94,150 +104,62 @@ export default function Screen13() {
 		}
 	}, [user, navigate, enqueueSnackbar]);
 
-	// Load completed orders
+	// Load all manifests with pallet counts
 	useEffect(() => {
-		if (showOrderList) {
-			const loadCompletedOrders = async () => {
-				try {
-					setLoadingOrders(true);
-					const orders = await shippingOrders.getAll();
-					const completed = orders.filter((o: ShippingOrder) => o.status === "Completed");
-					const sorted = completed.sort((a, b) => {
-						const dateA = new Date(a.created_at).getTime();
-						const dateB = new Date(b.created_at).getTime();
-						return dateB - dateA;
-					});
-					setCompletedOrders(sorted);
-					if (sorted.length === 0) {
-						enqueueSnackbar("No completed shipping orders available", { variant: "info" });
-					}
-				} catch {
-					enqueueSnackbar("Failed to load orders", { variant: "error" });
-				} finally {
-					setLoadingOrders(false);
-				}
-			};
-			loadCompletedOrders();
-		}
-	}, [showOrderList, enqueueSnackbar]);
-
-	// Load shipping order and loaded items
-	useEffect(() => {
-		const loadData = async () => {
-			const orderId = selectedOrderId || shippingOrderId;
-			if (!orderId) return;
-
+		const loadManifests = async () => {
 			try {
 				setIsLoading(true);
 				setError(null);
 
-				// Fetch shipping order
-				const order = await shippingOrders.getById(orderId);
+				// Fetch all manifests
+				const allManifests = await manifests.getAll();
 
-				if (order.status !== "Completed") {
-					enqueueSnackbar("Shipping order is not in Completed status", { variant: "error" });
-					navigate("/warehouse/home");
-					return;
-				}
+				// For each manifest, count loaded pallets
+				const manifestRowsData: ManifestRow[] = [];
 
-				setShippingOrder(order);
+				for (const manifest of allManifests) {
+					// Count pallets for this manifest
+					const { data: palletData, error: palletError } = await supabase
+						.from("pallets")
+						.select("id", { count: "exact" })
+						.eq("manifest_id", manifest.id)
+						.in("status", ["Loaded", "Shipped"]);
 
-				// Fetch manifest data to get container and seal numbers
-				let manifestData: Manifest | null = null;
-				if (manifestId) {
-					try {
-						manifestData = await manifests.getById(manifestId);
-						setManifest(manifestData);
-					} catch (error_) {
-						console.warn("Failed to fetch manifest:", error_);
+					if (palletError) {
+						console.error(`Error counting pallets for manifest ${manifest.id}:`, palletError);
+						continue;
 					}
-				} else {
-					// Try to find manifest by shipping order - optimized query
-					try {
-						// Direct query to find manifest with pallets for this shipping order
-						const { data: manifestPallets } = await supabase
-							.from("pallets")
-							.select("manifest_id")
-							.eq("shipping_order_id", orderId)
-							.eq("status", "Loaded")
-							.limit(1);
 
-						if (manifestPallets && manifestPallets.length > 0) {
-							const manifestId = manifestPallets[0].manifest_id;
-							if (manifestId) {
-								const manifestData = await manifests.getById(manifestId);
-								if (manifestData) {
-									setManifest(manifestData);
-								}
-							}
-						}
-					} catch (error_) {
-						console.warn("Failed to find manifest:", error_);
-					}
+					const totalPallets = palletData?.length || 0;
+
+					// Create manifest ref (use seal_num or first 8 chars of ID)
+					const manifestRef = manifest.seal_num || manifest.id.slice(0, 8).toUpperCase();
+
+					manifestRowsData.push({
+						id: manifest.id,
+						manifestRef,
+						type: manifest.type,
+						status: manifest.status,
+						totalPallets,
+						containerNum: manifest.container_num || undefined,
+						sealNum: manifest.seal_num || undefined,
+					});
 				}
 
-				// Fetch loaded pallets using direct Supabase query
-				const { data: loadedPalletsData, error: palletsError } = await supabase
-					.from("pallets")
-					.select("*")
-					.eq("shipping_order_id", orderId)
-					.eq("status", "Loaded");
-				const loadedPallets = loadedPalletsData || [];
-				if (palletsError) {
-					console.error("❌ [SCREEN 13] Error fetching loaded pallets:", palletsError);
-				}
+				// Sort by status (Open first, then Closed, then Cancelled) and creation date
+				manifestRowsData.sort((a, b) => {
+					// Status priority: Open > Closed > Cancelled
+					const statusOrder = { Open: 0, Closed: 1, Cancelled: 2 };
+					const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+					if (statusDiff !== 0) return statusDiff;
 
-				// Calculate loaded items (group by product, sum quantities, count pallets)
-				const itemMap = new Map<string, { description: string; totalQty: number; palletCount: number }>();
+					// Within same status, sort by ID (newest first)
+					return b.id.localeCompare(a.id);
+				});
 
-				// Batch fetch all unique products at once
-				const uniqueItemIds = [...new Set(loadedPallets.map((p) => p.item_id))];
-				const productPromises = uniqueItemIds.map((itemId) =>
-					products.getByItemId(itemId).catch((error) => {
-						console.error(`Failed to load product ${itemId}:`, error);
-						return null;
-					})
-				);
-				const productResults = await Promise.all(productPromises);
-
-				// Create product lookup map
-				const productMap = new Map<string, Product | null>();
-				for (const [index, product] of productResults.entries()) {
-					if (product) {
-						productMap.set(uniqueItemIds[index], product);
-					}
-				}
-
-				// Process pallets with cached product data
-				for (const pallet of loadedPallets) {
-					const product = productMap.get(pallet.item_id);
-					if (!product) continue;
-
-					const existing = itemMap.get(pallet.item_id);
-
-					if (existing) {
-						existing.totalQty += pallet.qty;
-						existing.palletCount += 1;
-					} else {
-						itemMap.set(pallet.item_id, {
-							description: product.description,
-							totalQty: pallet.qty,
-							palletCount: 1,
-						});
-					}
-				}
-
-				// Convert to loaded items array
-				const items: LoadedItem[] = [...itemMap.entries()].map(([itemId, data]) => ({
-					itemId,
-					description: data.description,
-					qtyLoaded: data.totalQty,
-					palletCount: data.palletCount,
-				}));
-
-				setLoadedItems(items);
+				setManifestRows(manifestRowsData);
 			} catch (error_) {
-				const message = error_ instanceof Error ? error_.message : "Failed to load data";
+				const message = error_ instanceof Error ? error_.message : "Failed to load manifests";
 				setError(message);
 				enqueueSnackbar(message, { variant: "error" });
 			} finally {
@@ -245,15 +167,95 @@ export default function Screen13() {
 			}
 		};
 
-		loadData();
-	}, [selectedOrderId, shippingOrderId, manifestId, navigate, enqueueSnackbar]);
+		loadManifests();
+	}, [enqueueSnackbar]);
 
-	// Handle order selection
-	const handleSelectOrder = async (orderId: string) => {
-		setLoadingOrderId(orderId); // Show loading state on specific card
-		setSelectedOrderId(orderId);
-		setShowOrderList(false);
-		setIsLoading(true);
+	// Load manifest details
+	const loadManifestDetails = async (manifestId: string) => {
+		try {
+			setIsLoadingDetail(true);
+			setError(null);
+
+			// Fetch manifest
+			const manifest = await manifests.getById(manifestId);
+			setManifestDetail(manifest);
+
+			// Fetch loaded pallets
+			const { data: loadedPalletsData } = await supabase
+				.from("pallets")
+				.select("*")
+				.eq("manifest_id", manifestId)
+				.in("status", ["Loaded", "Shipped"]);
+
+			const loadedPallets = loadedPalletsData || [];
+
+			// Calculate loaded items (group by product)
+			const itemMap = new Map<string, { description: string; totalQty: number; palletCount: number }>();
+
+			// Batch fetch products
+			const uniqueItemIds = [...new Set(loadedPallets.map((p) => p.item_id))];
+			const productPromises = uniqueItemIds.map((itemId) => products.getByItemId(itemId).catch(() => null));
+			const productResults = await Promise.all(productPromises);
+
+			// Create product lookup map
+			const productMap = new Map<string, Product | null>();
+			for (const [index, product] of productResults.entries()) {
+				if (product) {
+					productMap.set(uniqueItemIds[index], product);
+				}
+			}
+
+			// Process pallets
+			for (const pallet of loadedPallets) {
+				const product = productMap.get(pallet.item_id);
+				if (!product) continue;
+
+				const existing = itemMap.get(pallet.item_id);
+				if (existing) {
+					existing.totalQty += pallet.qty;
+					existing.palletCount += 1;
+				} else {
+					itemMap.set(pallet.item_id, {
+						description: product.description,
+						totalQty: pallet.qty,
+						palletCount: 1,
+					});
+				}
+			}
+
+			// Convert to loaded items array
+			const items: LoadedItem[] = [...itemMap.entries()].map(([itemId, data]) => ({
+				itemId,
+				description: data.description,
+				qtyLoaded: data.totalQty,
+				palletCount: data.palletCount,
+			}));
+
+			setLoadedItems(items);
+		} catch (error_) {
+			const message = error_ instanceof Error ? error_.message : "Failed to load manifest details";
+			setError(message);
+			enqueueSnackbar(message, { variant: "error" });
+		} finally {
+			setIsLoadingDetail(false);
+		}
+	};
+
+	// Handle view details
+	const handleViewDetails = async (manifestId: string) => {
+		setSelectedManifestId(manifestId);
+		await loadManifestDetails(manifestId);
+	};
+
+	// Handle back to grid
+	const handleBackToGrid = () => {
+		setSelectedManifestId(null);
+		setManifestDetail(null);
+		setLoadedItems([]);
+		setFormFile(null);
+		setPhotoFiles([]);
+		setIsFinalized(false);
+		setError(null);
 	};
 
 	// Handle form file change
@@ -265,12 +267,10 @@ export default function Screen13() {
 				enqueueSnackbar("Invalid file type. Please upload PDF, JPEG, or PNG.", { variant: "error" });
 				return;
 			}
-
 			if (file.size > 10 * 1024 * 1024) {
 				enqueueSnackbar("File is too large. Maximum size is 10MB.", { variant: "error" });
 				return;
 			}
-
 			setFormFile(file);
 		}
 	};
@@ -280,7 +280,6 @@ export default function Screen13() {
 		const files = event.target.files;
 		if (files) {
 			const newPhotos: File[] = [];
-
 			for (const file of files) {
 				const validTypes = ["image/jpeg", "image/png"];
 				if (!validTypes.includes(file.type)) {
@@ -289,15 +288,12 @@ export default function Screen13() {
 					});
 					continue;
 				}
-
 				if (file.size > 10 * 1024 * 1024) {
 					enqueueSnackbar(`${file.name} is too large. Maximum size is 10MB.`, { variant: "error" });
 					continue;
 				}
-
 				newPhotos.push(file);
 			}
-
 			setPhotoFiles((prev) => [...prev, ...newPhotos]);
 		}
 	};
@@ -309,7 +305,7 @@ export default function Screen13() {
 
 	// Download loading summary CSV
 	const handleDownloadSummary = () => {
-		if (!shippingOrder || loadedItems.length === 0) return;
+		if (!manifestDetail || loadedItems.length === 0) return;
 
 		try {
 			const headers = ["Item ID", "Description", "Qty Loaded", "Pallets"];
@@ -324,10 +320,10 @@ export default function Screen13() {
 			const totalPallets = loadedItems.reduce((sum, item) => sum + item.palletCount, 0);
 			rows.push(["", "TOTAL", totalQty.toString(), totalPallets.toString()]);
 
+			const manifestRef = manifestDetail.seal_num || manifestDetail.id.slice(0, 8).toUpperCase();
 			const csvContent = [
-				`Manifest Ref: ${shippingOrder.seal_num || "AUTO-GENERATED"}`,
-				`Type: ${shippingOrder.shipment_type === "Hand_Delivery" ? "Hand Delivery" : "Container Loading"}`,
-				`Order Ref: ${shippingOrder.order_ref}`,
+				`Manifest Ref: ${manifestRef}`,
+				`Type: ${isHandDelivery(manifestDetail.type) ? "Hand Delivery" : "Container"}`,
 				`Generated: ${new Date().toLocaleString()}`,
 				"",
 				headers.join(","),
@@ -338,13 +334,13 @@ export default function Screen13() {
 			const link = document.createElement("a");
 			const url = URL.createObjectURL(blob);
 			link.setAttribute("href", url);
-			link.setAttribute("download", `loading-summary-${shippingOrder.order_ref}.csv`);
+			link.setAttribute("download", `manifest-${manifestRef}.csv`);
 			link.style.visibility = "hidden";
 			document.body.append(link);
 			link.click();
 			link.remove();
 
-			enqueueSnackbar("✅ Loading summary downloaded", { variant: "success" });
+			enqueueSnackbar("✅ Manifest summary downloaded", { variant: "success" });
 		} catch (error_) {
 			const message = error_ instanceof Error ? error_.message : "Failed to download";
 			enqueueSnackbar(message, { variant: "error" });
@@ -353,8 +349,10 @@ export default function Screen13() {
 
 	// Close manifest and send email
 	const handleCloseManifest = async () => {
-		if (!shippingOrder || !formFile) {
-			enqueueSnackbar("❌ Please upload the signed customer form before closing manifest", { variant: "error" });
+		if (!manifestDetail || !formFile) {
+			enqueueSnackbar("❌ Please upload the signed customer form before closing manifest", {
+				variant: "error",
+			});
 			return;
 		}
 
@@ -363,12 +361,11 @@ export default function Screen13() {
 
 			// Upload form file
 			const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-			// Sanitize filename to remove spaces and special characters that cause upload errors
 			const sanitizedFormName = formFile.name
-				.replaceAll(/[^a-zA-Z0-9.-]/g, "_") // Replace special chars with underscores
-				.replaceAll(/_{2,}/g, "_") // Replace multiple underscores with single
-				.toLowerCase(); // Convert to lowercase for consistency
-			const formPath = `shipping/${shippingOrder.id}/form_${timestamp}_${sanitizedFormName}`;
+				.replaceAll(/[^a-zA-Z0-9.-]/g, "_")
+				.replaceAll(/_{2,}/g, "_")
+				.toLowerCase();
+			const formPath = `manifests/${manifestDetail.id}/form_${timestamp}_${sanitizedFormName}`;
 			await storage.upload("shipping", formPath, formFile);
 
 			// Upload photos if provided
@@ -376,41 +373,45 @@ export default function Screen13() {
 			if (photoFiles.length > 0) {
 				for (const [i, photo] of photoFiles.entries()) {
 					const photoTimestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-					const photoPath = `shipping/${shippingOrder.id}/photo_${photoTimestamp}_${i}.jpg`;
+					const photoPath = `manifests/${manifestDetail.id}/photo_${photoTimestamp}_${i}.jpg`;
 					await storage.upload("shipping", photoPath, photo);
 					photoUrls.push(photoPath);
 				}
 			}
 
 			// Send email
+			const manifestRef = manifestDetail.seal_num || manifestDetail.id.slice(0, 8).toUpperCase();
+			const shipmentType: "Hand_Delivery" | "Container_Loading" = isHandDelivery(manifestDetail.type)
+				? "Hand_Delivery"
+				: "Container_Loading";
 			const emailData = {
-				shippingOrderId: shippingOrder.id,
-				orderRef: shippingOrder.order_ref,
-				shipmentType: shippingOrder.shipment_type,
+				shippingOrderId: manifestDetail.id,
+				orderRef: manifestRef,
+				shipmentType,
 				items: loadedItems.map((item) => ({
 					itemId: item.itemId,
 					description: item.description,
 					qtyShipped: item.qtyLoaded,
 				})),
-				containerNum: shippingOrder.shipment_type === "Container_Loading" ? "TBD" : undefined,
-				sealNum: shippingOrder.seal_num,
+				containerNum: manifestDetail.container_num,
+				sealNum: manifestDetail.seal_num,
 				formUrl: formPath,
 				photoUrls,
 			};
 
 			await sendShippingEmail(emailData);
 
-			// Update shipping order status
-			await shippingOrders.update(shippingOrder.id, {
-				status: "Shipped",
-			});
+			// Update manifest status to Closed
+			await manifests.update(manifestDetail.id, { status: "Closed" });
 
-			// Update all loaded pallets to Shipped
-			const loadedPallets = await pallets.getFiltered({
-				shipping_order_id: shippingOrder.id,
-				status: "Loaded",
-			});
+			// Update all loaded pallets to Shipped - query directly via supabase
+			const { data: loadedPalletsData } = await supabase
+				.from("pallets")
+				.select("*")
+				.eq("manifest_id", manifestDetail.id)
+				.eq("status", "Loaded");
 
+			const loadedPallets = loadedPalletsData || [];
 			const now = new Date().toISOString();
 			for (const pallet of loadedPallets) {
 				await pallets.update(pallet.id, {
@@ -420,14 +421,15 @@ export default function Screen13() {
 			}
 
 			setIsFinalized(true);
-
 			enqueueSnackbar("✅ Manifest closed! All pallets marked as shipped. Email sent to customer.", {
 				variant: "success",
 			});
 
-			// Navigate to home after 2 seconds
+			// Navigate back to grid after 2 seconds
 			setTimeout(() => {
-				navigate("/warehouse/home");
+				handleBackToGrid();
+				// Reload manifests
+				globalThis.location.reload();
 			}, 2000);
 		} catch (error_) {
 			const message = error_ instanceof Error ? error_.message : "Failed to close manifest";
@@ -437,211 +439,62 @@ export default function Screen13() {
 		}
 	};
 
-	// Separate function to handle actual cancellation
-	const proceedWithCancellation = async (manifestToCancel: Manifest) => {
+	// Cancel manifest
+	const handleCancelManifest = async () => {
+		if (!manifestDetail) return;
+
 		try {
 			setIsCancelling(true);
-			// Step 1: Update manifest status to Cancelled
-			const { error: manifestError } = await supabase
-				.from("manifests")
-				.update({ status: "Cancelled" })
-				.eq("id", manifestToCancel.id);
 
-			if (manifestError) throw manifestError;
+			// Update manifest status to Cancelled
+			await manifests.update(manifestDetail.id, { status: "Cancelled" });
 
-			// Step 2: Reset all loaded pallets to Staged status
+			// FIRST: Get all shipping orders that have pallets in this manifest BEFORE updating pallets
+			const { data: palletsInManifest } = await supabase
+				.from("pallets")
+				.select("shipping_order_id")
+				.eq("manifest_id", manifestDetail.id)
+				.not("shipping_order_id", "is", null);
+
+			// THEN: Reset all loaded pallets to Staged status
 			const { error: palletsError } = await supabase
 				.from("pallets")
-				.update({ status: "Staged" })
-				.eq("manifest_id", manifestToCancel.id)
+				.update({ status: "Staged", manifest_id: null })
+				.eq("manifest_id", manifestDetail.id)
 				.eq("status", "Loaded");
 
 			if (palletsError) throw palletsError;
 
-			// Step 3: Update shipping order status back to Loading
-			if (shippingOrder) {
-				const { error: orderError } = await supabase
-					.from("shipping_orders")
-					.update({ status: "Loading" })
-					.eq("id", shippingOrder.id);
+			// FINALLY: Update shipping orders back to "Loading" status
+			if (palletsInManifest && palletsInManifest.length > 0) {
+				// Get unique shipping order IDs
+				const uniqueOrderIds = [...new Set(palletsInManifest.map((p) => p.shipping_order_id))];
 
-				if (orderError) throw orderError;
+				// Update each shipping order back to "Loading" status
+				for (const orderId of uniqueOrderIds) {
+					await supabase.from("shipping_orders").update({ status: "Loading" }).eq("id", orderId);
+				}
 			}
 
-			enqueueSnackbar("✅ Manifest cancelled successfully! Loaded pallets reset to Staged status.", {
-				variant: "success",
-			});
+			enqueueSnackbar(
+				"✅ Manifest cancelled successfully! Pallets reset to Staged and shipping order set back to Loading.",
+				{
+					variant: "success",
+				}
+			);
 
-			// Close dialog and redirect to dashboard after 1.5 seconds
 			setCancelDialogOpen(false);
 			setTimeout(() => {
-				navigate("/warehouse");
+				handleBackToGrid();
+				globalThis.location.reload();
 			}, 1500);
 		} catch (error_) {
-			console.error("Error cancelling manifest:", error_);
 			const message = error_ instanceof Error ? error_.message : "Failed to cancel manifest";
 			enqueueSnackbar(`❌ ${message}`, { variant: "error" });
 		} finally {
 			setIsCancelling(false);
 		}
 	};
-
-	// Fallback function to handle cancellation by shipping order (when pallets have no manifest_id)
-	const proceedWithCancellationByOrder = async (orderId: string) => {
-		try {
-			setIsCancelling(true);
-			// Step 1: Reset all loaded pallets to Staged status for this order
-			const { error: palletsError } = await supabase
-				.from("pallets")
-				.update({ status: "Staged" })
-				.eq("shipping_order_id", orderId)
-				.eq("status", "Loaded");
-
-			if (palletsError) throw palletsError;
-
-			// Step 2: Update shipping order status back to Loading
-			if (shippingOrder) {
-				const { error: orderError } = await supabase
-					.from("shipping_orders")
-					.update({ status: "Loading" })
-					.eq("id", shippingOrder.id);
-
-				if (orderError) throw orderError;
-			}
-
-			enqueueSnackbar("✅ Order cancelled successfully! Loaded pallets reset to Staged status.", {
-				variant: "success",
-			});
-
-			// Close dialog and redirect to dashboard after 1.5 seconds
-			setCancelDialogOpen(false);
-			setTimeout(() => {
-				navigate("/warehouse");
-			}, 1500);
-		} catch (error_) {
-			console.error("Error cancelling order:", error_);
-			const message = error_ instanceof Error ? error_.message : "Failed to cancel order";
-			enqueueSnackbar(`❌ ${message}`, { variant: "error" });
-		} finally {
-			setIsCancelling(false);
-		}
-	};
-
-	// Cancel manifest
-	const handleCancelManifest = async () => {
-		if (!manifest) {
-			// Try to find manifest by shipping order as fallback
-			// Use shippingOrder.id if shippingOrderId is undefined
-			const orderId = shippingOrderId || (shippingOrder ? shippingOrder.id : null);
-
-			if (orderId) {
-				try {
-					const allManifests = await manifests.getFiltered({});
-					for (const mani of allManifests) {
-						const { data: manifestPallets } = await supabase
-							.from("pallets")
-							.select("*")
-							.eq("manifest_id", mani.id)
-							.eq("shipping_order_id", orderId);
-						if (manifestPallets && manifestPallets.length > 0) {
-							// Set the manifest and proceed with cancellation directly
-							setManifest(mani);
-							// Continue with cancellation logic immediately
-							return proceedWithCancellation(mani);
-						}
-					}
-					const { data: allOrderPallets, error: debugError } = await supabase
-						.from("pallets")
-						.select("*")
-						.eq("shipping_order_id", orderId);
-
-					if (debugError) {
-						console.error("❌ Error fetching order pallets:", debugError);
-					}
-
-					// Fallback: If no manifest found but pallets exist, cancel by shipping order
-					if (allOrderPallets && allOrderPallets.length > 0) {
-						return proceedWithCancellationByOrder(orderId);
-					}
-
-					console.error("❌ No manifest found for shipping order:", orderId);
-					enqueueSnackbar("No manifest found for this shipping order", { variant: "error" });
-				} catch (error_) {
-					console.error("Error finding manifest:", error_);
-					enqueueSnackbar("Failed to find manifest for cancellation", { variant: "error" });
-				}
-			} else {
-				enqueueSnackbar("No shipping order ID available for manifest cancellation", { variant: "error" });
-			}
-			return;
-		}
-
-		// If we have a manifest, proceed with cancellation
-		if (manifest) {
-			return proceedWithCancellation(manifest);
-		}
-	};
-
-	// Show order list
-	if (showOrderList) {
-		if (loadingOrders) {
-			return (
-				<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-					<CircularProgress />
-				</Box>
-			);
-		}
-
-		return (
-			<Box sx={{ p: 3 }}>
-				<Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-					Select Completed Shipping Order
-				</Typography>
-
-				{completedOrders.length === 0 ? (
-					<Alert severity="info">No completed shipping orders available</Alert>
-				) : (
-					<Box
-						sx={{
-							display: "grid",
-							gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr", lg: "1fr 1fr 1fr 1fr" },
-							gap: 2,
-						}}
-					>
-						{completedOrders.map((order) => (
-							<Card
-								key={order.id}
-								onClick={() => handleSelectOrder(order.id)}
-								sx={{
-									cursor: loadingOrderId === order.id ? "default" : "pointer",
-									"&:hover": loadingOrderId === order.id ? {} : { boxShadow: 3 },
-									transition: "all 0.2s",
-									opacity: loadingOrderId === order.id ? 0.7 : 1,
-								}}
-							>
-								<CardContent>
-									<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-										<Box sx={{ flex: 1 }}>
-											<Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-												{order.order_ref}
-											</Typography>
-											<Typography color="textSecondary" variant="body2" sx={{ mb: 1 }}>
-												Type: {order.shipment_type === "Hand_Delivery" ? "Hand Delivery" : "Container"}
-											</Typography>
-											<Typography color="textSecondary" variant="body2">
-												Created: {new Date(order.created_at).toLocaleDateString()}
-											</Typography>
-										</Box>
-										{loadingOrderId === order.id && <CircularProgress size={24} />}
-									</Box>
-								</CardContent>
-							</Card>
-						))}
-					</Box>
-				)}
-			</Box>
-		);
-	}
 
 	if (isLoading) {
 		return (
@@ -651,340 +504,334 @@ export default function Screen13() {
 		);
 	}
 
-	if (error || !shippingOrder) {
+	if (error) {
 		return (
 			<Box sx={{ p: 3 }}>
-				<Alert severity="error">{error || "Failed to load shipping order"}</Alert>
-				<Button
-					startIcon={<ArrowLeftIcon />}
-					onClick={() => {
-						setShowOrderList(true);
-						setSelectedOrderId(null);
-						setLoadingOrderId(null); // Reset the loading state
-						setShippingOrder(null);
-						setManifest(null);
-						setLoadedItems([]);
-						setFormFile(null);
-						setPhotoFiles([]);
-						setError(null);
-						setIsFinalized(false);
-					}}
-					sx={{ mt: 2 }}
-				>
-					Back to Orders
-				</Button>
+				<Alert severity="error">{error}</Alert>
 			</Box>
 		);
 	}
 
-	const totalQtyLoaded = loadedItems.reduce((sum, item) => sum + item.qtyLoaded, 0);
-	const manifestRef = shippingOrder.seal_num || `AUTO-${shippingOrder.id.slice(0, 8)}`;
+	// Show detail view if manifest is selected
+	if (selectedManifestId && manifestDetail) {
+		const manifestRef = manifestDetail.seal_num || manifestDetail.id.slice(0, 8).toUpperCase();
 
+		return (
+			<Box sx={{ p: 3 }}>
+				{/* Back Button */}
+				<Button startIcon={<ArrowLeftIcon />} onClick={handleBackToGrid} sx={{ mb: 3 }}>
+					Back to Manifests
+				</Button>
+
+				{/* Loading Detail */}
+				{isLoadingDetail && (
+					<Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
+						<CircularProgress />
+					</Box>
+				)}
+
+				{/* Detail View */}
+				{!isLoadingDetail && (
+					<>
+						{/* Header */}
+						<Box sx={{ mb: 4 }}>
+							<Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+								📦 Manifest Details: {manifestRef}
+							</Typography>
+							<Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+								<Chip
+									label={isHandDelivery(manifestDetail.type) ? "Hand Delivery" : "Container"}
+									color={isHandDelivery(manifestDetail.type) ? "primary" : "secondary"}
+									variant="outlined"
+								/>
+								<Chip
+									label={manifestDetail.status}
+									color={
+										manifestDetail.status === "Open"
+											? "warning"
+											: manifestDetail.status === "Closed"
+												? "success"
+												: "default"
+									}
+								/>
+								{!isHandDelivery(manifestDetail.type) && manifestDetail.container_num && (
+									<Chip label={`Container: ${manifestDetail.container_num}`} variant="outlined" />
+								)}
+								<Chip label={`Seal: ${manifestDetail.seal_num}`} variant="outlined" />
+							</Box>
+						</Box>
+
+						{/* Loaded Items Table */}
+						<Card sx={{ mb: 3 }}>
+							<CardContent>
+								<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+									<Typography variant="h6" sx={{ fontWeight: 600 }}>
+										Loaded Items
+									</Typography>
+									<Button
+										startIcon={<DownloadIcon />}
+										onClick={handleDownloadSummary}
+										disabled={loadedItems.length === 0}
+									>
+										Download CSV
+									</Button>
+								</Box>
+
+								{loadedItems.length === 0 ? (
+									<Alert severity="info">No items loaded in this manifest</Alert>
+								) : (
+									<TableContainer>
+										<Table size="small">
+											<TableHead>
+												<TableRow>
+													<TableCell sx={{ fontWeight: 600 }}>Item ID</TableCell>
+													<TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+													<TableCell align="right" sx={{ fontWeight: 600 }}>
+														Qty Loaded
+													</TableCell>
+													<TableCell align="right" sx={{ fontWeight: 600 }}>
+														Pallets
+													</TableCell>
+												</TableRow>
+											</TableHead>
+											<TableBody>
+												{loadedItems.map((item) => (
+													<TableRow key={item.itemId}>
+														<TableCell>{item.itemId}</TableCell>
+														<TableCell>{item.description}</TableCell>
+														<TableCell align="right">{item.qtyLoaded}</TableCell>
+														<TableCell align="right">{item.palletCount}</TableCell>
+													</TableRow>
+												))}
+												<TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+													<TableCell colSpan={2} sx={{ fontWeight: 600 }}>
+														TOTAL
+													</TableCell>
+													<TableCell align="right" sx={{ fontWeight: 600 }}>
+														{loadedItems.reduce((sum, item) => sum + item.qtyLoaded, 0)}
+													</TableCell>
+													<TableCell align="right" sx={{ fontWeight: 600 }}>
+														{loadedItems.reduce((sum, item) => sum + item.palletCount, 0)}
+													</TableCell>
+												</TableRow>
+											</TableBody>
+										</Table>
+									</TableContainer>
+								)}
+							</CardContent>
+						</Card>
+
+						{/* Upload Signed Customer Form */}
+						{manifestDetail.status === "Open" && (
+							<Card sx={{ mb: 3 }}>
+								<CardContent>
+									<Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+										Upload Signed Customer Form
+									</Typography>
+									<Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+										Upload the signed delivery note or shipping form (PDF, JPEG, or PNG)
+									</Typography>
+									<TextField
+										type="file"
+										fullWidth
+										inputProps={{ accept: "application/pdf,image/jpeg,image/png" }}
+										onChange={handleFormFileChange}
+										disabled={isSubmitting || isFinalized}
+									/>
+									{formFile && (
+										<Typography variant="body2" sx={{ mt: 1, color: "success.main" }}>
+											✓ {formFile.name} selected
+										</Typography>
+									)}
+								</CardContent>
+							</Card>
+						)}
+
+						{/* Upload Loading Photos (Optional) */}
+						{manifestDetail.status === "Open" && (
+							<Card sx={{ mb: 3 }}>
+								<CardContent>
+									<Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+										Upload Loading Photos (Optional)
+									</Typography>
+									<TextField
+										type="file"
+										fullWidth
+										inputProps={{ accept: "image/jpeg,image/png", multiple: true }}
+										onChange={handlePhotoFileChange}
+										disabled={isSubmitting || isFinalized}
+									/>
+									{photoFiles.length > 0 && (
+										<Box sx={{ mt: 2 }}>
+											<Typography variant="body2" sx={{ mb: 1 }}>
+												{photoFiles.length} photo(s) selected:
+											</Typography>
+											{photoFiles.map((photo, index) => (
+												<Box key={index} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+													<Typography variant="body2">{photo.name}</Typography>
+													<Button
+														size="small"
+														color="error"
+														onClick={() => handleRemovePhoto(index)}
+														disabled={isSubmitting || isFinalized}
+													>
+														Remove
+													</Button>
+												</Box>
+											))}
+										</Box>
+									)}
+								</CardContent>
+							</Card>
+						)}
+
+						{/* Finalization Message */}
+						{isFinalized && (
+							<Alert severity="success" sx={{ mb: 3 }}>
+								✅ Manifest closed! All pallets marked as shipped. Email sent to customer. Navigating back...
+							</Alert>
+						)}
+
+						{/* Action Buttons */}
+						{manifestDetail.status === "Open" && (
+							<Box sx={{ display: "flex", gap: 2 }}>
+								<Button
+									variant="contained"
+									color="success"
+									startIcon={isSubmitting ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+									onClick={handleCloseManifest}
+									disabled={isSubmitting || !formFile || isFinalized}
+								>
+									{isSubmitting ? "Closing..." : "Close Manifest & Send Email"}
+								</Button>
+								<Button
+									variant="outlined"
+									color="error"
+									startIcon={<XCircleIcon />}
+									onClick={() => setCancelDialogOpen(true)}
+									disabled={isSubmitting || isCancelling || isFinalized}
+								>
+									Cancel Manifest
+								</Button>
+							</Box>
+						)}
+
+						{/* Closed/Cancelled Status */}
+						{manifestDetail.status === "Closed" && (
+							<Alert severity="success">This manifest has been closed and shipped.</Alert>
+						)}
+						{manifestDetail.status === "Cancelled" && (
+							<Alert severity="warning">This manifest has been cancelled.</Alert>
+						)}
+					</>
+				)}
+
+				{/* Cancel Confirmation Dialog */}
+				<Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
+					<DialogTitle>Cancel Manifest?</DialogTitle>
+					<DialogContent>
+						<DialogContentText>
+							Are you sure you want to cancel this manifest? This will:
+							<ul>
+								<li>Mark the manifest as Cancelled</li>
+								<li>Reset all loaded pallets to Staged status</li>
+								<li>Set shipping order status back to Loading</li>
+								<li>Remove the manifest association from pallets</li>
+							</ul>
+							Pallets will be available for loading into a new container. This action cannot be undone.
+						</DialogContentText>
+					</DialogContent>
+					<DialogActions>
+						<Button onClick={() => setCancelDialogOpen(false)} disabled={isCancelling}>
+							No, Keep It
+						</Button>
+						<Button onClick={handleCancelManifest} color="error" disabled={isCancelling}>
+							{isCancelling ? "Cancelling..." : "Yes, Cancel Manifest"}
+						</Button>
+					</DialogActions>
+				</Dialog>
+			</Box>
+		);
+	}
+
+	// Show grid view
 	return (
-		<Box sx={{ p: 3, maxWidth: 1000, mx: "auto" }}>
+		<Box sx={{ p: 3 }}>
 			{/* Header */}
 			<Box sx={{ mb: 4 }}>
-				<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-					<Typography variant="h4" sx={{ fontWeight: 700 }}>
-						📦 Shipping Summary & Docs
-					</Typography>
-					<Button
-						startIcon={<ArrowLeftIcon />}
-						onClick={() => {
-							setShowOrderList(true);
-							setSelectedOrderId(null);
-							setLoadingOrderId(null); // Reset the loading state
-							setShippingOrder(null);
-							setManifest(null);
-							setLoadedItems([]);
-							setFormFile(null);
-							setPhotoFiles([]);
-							setError(null);
-							setIsFinalized(false);
-						}}
-						variant="outlined"
-					>
-						Back
-					</Button>
-				</Box>
+				<Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+					🚛 Manifests
+				</Typography>
+				<Typography color="textSecondary" variant="body1">
+					All manifests (trucks/trips) including Open ones. Each row represents one manifest.
+				</Typography>
 			</Box>
 
-			{/* Manifest Info Card */}
-			<Card sx={{ mb: 3 }}>
-				<CardContent>
-					<Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 3 }}>
-						<Box>
-							<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-								Manifest Ref / Trip ID
-							</Typography>
-							<Typography variant="h6" sx={{ fontWeight: 600 }}>
-								{manifestRef}
-							</Typography>
-						</Box>
-						<Box>
-							<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-								Type
-							</Typography>
-							<Chip
-								label={shippingOrder.shipment_type === "Hand_Delivery" ? "Hand Delivery" : "Container"}
-								color={shippingOrder.shipment_type === "Hand_Delivery" ? "primary" : "secondary"}
-								variant="outlined"
-							/>
-						</Box>
-						{manifest && manifest.container_num && (
-							<Box>
-								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-									Container #
-								</Typography>
-								<Typography variant="h6" sx={{ fontWeight: 600 }}>
-									{manifest.container_num}
-								</Typography>
-							</Box>
-						)}
-						{manifest && manifest.seal_num && (
-							<Box>
-								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-									Seal #
-								</Typography>
-								<Typography variant="h6" sx={{ fontWeight: 600 }}>
-									{manifest.seal_num}
-								</Typography>
-							</Box>
-						)}
-						{shippingOrder.seal_num && !manifest?.seal_num && (
-							<Box>
-								<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-									Seal #
-								</Typography>
-								<Typography variant="h6" sx={{ fontWeight: 600 }}>
-									{shippingOrder.seal_num}
-								</Typography>
-							</Box>
-						)}
-						<Box>
-							<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-								Status
-							</Typography>
-							<Chip label="Open" color="warning" variant="outlined" />
-						</Box>
-						<Box>
-							<Typography color="textSecondary" variant="body2" sx={{ mb: 0.5 }}>
-								Order Ref
-							</Typography>
-							<Typography variant="h6">{shippingOrder.order_ref}</Typography>
-						</Box>
-					</Box>
-				</CardContent>
-			</Card>
-
-			{/* Loaded Items Table */}
-			<Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-				Loaded Items
-			</Typography>
-
-			{loadedItems.length === 0 ? (
-				<Alert severity="info" sx={{ mb: 3 }}>
-					No items loaded in this shipment
-				</Alert>
+			{/* Manifests Table */}
+			{manifestRows.length === 0 ? (
+				<Alert severity="info">No manifests found. Create manifests on Screen 4 (Register Container).</Alert>
 			) : (
-				<TableContainer component={Paper} sx={{ mb: 3 }}>
+				<TableContainer component={Paper}>
 					<Table>
 						<TableHead sx={{ backgroundColor: "#f5f5f5" }}>
 							<TableRow>
-								<TableCell sx={{ fontWeight: 600 }}>Item ID</TableCell>
-								<TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+								<TableCell sx={{ fontWeight: 600 }}>Manifest Ref</TableCell>
+								<TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+								<TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
 								<TableCell align="right" sx={{ fontWeight: 600 }}>
-									Qty Loaded
+									Total Pallets
+								</TableCell>
+								<TableCell align="center" sx={{ fontWeight: 600 }}>
+									Actions
 								</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
-							{loadedItems.map((item) => (
-								<TableRow key={item.itemId} hover>
-									<TableCell sx={{ fontWeight: 500 }}>{item.itemId}</TableCell>
-									<TableCell>{item.description}</TableCell>
-									<TableCell align="right">{item.qtyLoaded}</TableCell>
+							{manifestRows.map((row) => (
+								<TableRow key={row.id} hover>
+									<TableCell sx={{ fontWeight: 500 }}>{row.manifestRef}</TableCell>
+									<TableCell>
+										<Chip
+											label={isHandDelivery(row.type) ? "Hand Delivery" : "Container"}
+											color={isHandDelivery(row.type) ? "primary" : "secondary"}
+											size="small"
+											variant="outlined"
+										/>
+									</TableCell>
+									<TableCell>
+										<Chip
+											label={row.status}
+											color={row.status === "Open" ? "warning" : row.status === "Closed" ? "success" : "default"}
+											size="small"
+										/>
+									</TableCell>
+									<TableCell align="right">{row.totalPallets}</TableCell>
+									<TableCell align="center">
+										<Button
+											variant="outlined"
+											size="small"
+											startIcon={<EyeIcon />}
+											onClick={() => handleViewDetails(row.id)}
+										>
+											View
+										</Button>
+									</TableCell>
 								</TableRow>
 							))}
-							<TableRow sx={{ backgroundColor: "#f9f9f9", fontWeight: 600 }}>
-								<TableCell colSpan={2} sx={{ fontWeight: 600 }}>
-									TOTAL
-								</TableCell>
-								<TableCell align="right" sx={{ fontWeight: 600 }}>
-									{totalQtyLoaded}
-								</TableCell>
-							</TableRow>
 						</TableBody>
 					</Table>
 				</TableContainer>
 			)}
 
-			{/* Download CSV Button */}
-			<Box sx={{ mb: 3 }}>
-				<Button
-					variant="contained"
-					startIcon={<DownloadIcon />}
-					onClick={handleDownloadSummary}
-					disabled={isSubmitting || loadedItems.length === 0 || isFinalized}
-					sx={{ mb: 2 }}
-				>
-					📥 Download Loading Summary CSV
-				</Button>
+			{/* Summary */}
+			<Box sx={{ mt: 3, p: 2, backgroundColor: "#f9f9f9", borderRadius: 1 }}>
 				<Typography variant="body2" color="textSecondary">
-					Use this CSV for paperwork and customer documentation
+					<strong>Total Manifests:</strong> {manifestRows.length} | <strong>Open:</strong>{" "}
+					{manifestRows.filter((r) => r.status === "Open").length} | <strong>Closed:</strong>{" "}
+					{manifestRows.filter((r) => r.status === "Closed").length} | <strong>Cancelled:</strong>{" "}
+					{manifestRows.filter((r) => r.status === "Cancelled").length}
 				</Typography>
 			</Box>
-
-			{/* Upload Signed Customer Form */}
-			<Card sx={{ mb: 3 }}>
-				<CardContent>
-					<Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-						Upload Signed Customer Form <span style={{ color: "red" }}>*</span> (Mandatory)
-					</Typography>
-
-					<Box sx={{ mb: 2 }}>
-						<TextField
-							type="file"
-							inputProps={{ accept: ".pdf,.jpg,.jpeg,.png" }}
-							onChange={handleFormFileChange}
-							fullWidth
-							disabled={isSubmitting || isFinalized}
-						/>
-						{formFile && (
-							<Typography variant="body2" sx={{ mt: 1, color: "success.main", fontWeight: 600 }}>
-								✓ {formFile.name} selected
-							</Typography>
-						)}
-					</Box>
-
-					<Alert severity="info">
-						Upload the signed delivery note / BOL (PDF or image). Maximum file size: 10MB. Required before closing
-						manifest.
-					</Alert>
-				</CardContent>
-			</Card>
-
-			{/* Upload Loading Photos */}
-			<Card sx={{ mb: 3 }}>
-				<CardContent>
-					<Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-						Upload Loading Photos (Optional)
-					</Typography>
-
-					<Box sx={{ mb: 2 }}>
-						<TextField
-							type="file"
-							inputProps={{ accept: ".jpg,.jpeg,.png", multiple: true }}
-							onChange={handlePhotoFileChange}
-							fullWidth
-							disabled={isSubmitting || isFinalized}
-						/>
-					</Box>
-
-					{photoFiles.length > 0 && (
-						<Box sx={{ mb: 2 }}>
-							<Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-								Selected Photos ({photoFiles.length}):
-							</Typography>
-							{photoFiles.map((photo, index) => (
-								<Box
-									key={index}
-									sx={{
-										display: "flex",
-										justifyContent: "space-between",
-										alignItems: "center",
-										p: 1,
-										mb: 1,
-										backgroundColor: "#f5f5f5",
-										borderRadius: 1,
-									}}
-								>
-									<Typography variant="body2">{photo.name}</Typography>
-									<Button
-										size="small"
-										color="error"
-										onClick={() => handleRemovePhoto(index)}
-										disabled={isSubmitting || isFinalized}
-									>
-										Remove
-									</Button>
-								</Box>
-							))}
-						</Box>
-					)}
-
-					<Alert severity="info">
-						Upload photos of loaded truck, seal, etc. (JPEG or PNG). Maximum 10MB per file. Optional but recommended.
-					</Alert>
-				</CardContent>
-			</Card>
-
-			{/* Finalization Status */}
-			{isFinalized && (
-				<Alert severity="success" sx={{ mb: 3 }}>
-					✅ Manifest closed! All pallets marked as shipped. Email sent to customer. Navigating to home...
-				</Alert>
-			)}
-
-			{/* Action Buttons */}
-			<Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-				{/* Cancel Manifest Button */}
-				<Button
-					variant="outlined"
-					color="error"
-					size="large"
-					startIcon={<XCircleIcon />}
-					onClick={() => setCancelDialogOpen(true)}
-					disabled={isSubmitting || isCancelling || isFinalized}
-					sx={{ minWidth: 200 }}
-				>
-					{isCancelling ? <CircularProgress size={24} /> : "Cancel Manifest"}
-				</Button>
-
-				{/* Close Manifest Button */}
-				<Button
-					variant="contained"
-					color="success"
-					size="large"
-					startIcon={<CheckCircleIcon />}
-					onClick={handleCloseManifest}
-					disabled={isSubmitting || !formFile || isFinalized}
-					sx={{ minWidth: 250 }}
-				>
-					{isSubmitting ? <CircularProgress size={24} /> : "✓ Close Manifest & Send Email"}
-				</Button>
-			</Box>
-
-			{/* Cancel Manifest Confirmation Dialog */}
-			<Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="sm" fullWidth>
-				<DialogTitle sx={{ color: "error.main", fontWeight: "bold" }}>Cancel Manifest</DialogTitle>
-				<DialogContent>
-					<DialogContentText>
-						Are you sure you want to cancel this manifest? This action will:
-						<ul style={{ marginTop: "1em", marginBottom: "1em" }}>
-							<li>
-								Set manifest status to <strong>Cancelled</strong>
-							</li>
-							<li>
-								Reset all loaded pallets to <strong>Staged</strong> status
-							</li>
-							<li>
-								Update shipping order status back to <strong>Loading</strong>
-							</li>
-							<li>Redirect you to the dashboard</li>
-						</ul>
-						This action cannot be undone. The pallets will need to be loaded again to a new manifest.
-					</DialogContentText>
-				</DialogContent>
-				<DialogActions>
-					<Button onClick={() => setCancelDialogOpen(false)} disabled={isCancelling}>
-						No, Keep Manifest
-					</Button>
-					<Button onClick={handleCancelManifest} color="error" variant="contained" disabled={isCancelling}>
-						{isCancelling ? <CircularProgress size={20} /> : "Yes, Cancel Manifest"}
-					</Button>
-				</DialogActions>
-			</Dialog>
 		</Box>
 	);
 }

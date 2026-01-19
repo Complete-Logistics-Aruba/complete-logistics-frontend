@@ -39,7 +39,7 @@ import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { useSnackbar } from "notistack";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { manifests, pallets, products, shippingOrders } from "../../lib/api/wms-api";
+import { pallets, products, shippingOrders } from "../../lib/api/wms-api";
 import { supabase } from "../../lib/auth/supabase-client";
 import type { Product, ShippingOrder } from "../../types/domain";
 
@@ -188,6 +188,38 @@ export default function Screen12() {
 		try {
 			const newStatus = isCurrentlyLoaded ? "Staged" : "Loaded";
 
+			// CRITICAL VALIDATION: Prevent over-loading (loading more than ordered)
+			// Only validate when checking (loading), not when unchecking
+			if (!isCurrentlyLoaded) {
+				const palletToLoad = palletRows.find((r) => r.palletId === palletId);
+				if (!palletToLoad) {
+					throw new Error("Pallet not found");
+				}
+
+				// Calculate total already loaded for this item
+				const alreadyLoadedForItem = palletRows
+					.filter((r) => r.itemId === palletToLoad.itemId && loadedPalletIds.has(r.palletId))
+					.reduce((sum, r) => sum + r.qty, 0);
+
+				// Get requested qty for this item from shipping order lines
+				const orderLine = shippingOrder?.lines?.find((l) => l.item_id === palletToLoad.itemId);
+				if (!orderLine) {
+					throw new Error("Order line not found for this item");
+				}
+
+				const requestedQty = orderLine.requested_qty;
+				const newTotal = alreadyLoadedForItem + palletToLoad.qty;
+
+				if (newTotal > requestedQty) {
+					const remaining = requestedQty - alreadyLoadedForItem;
+					enqueueSnackbar(
+						`Cannot load: Total qty (${newTotal}) would exceed ordered qty (${requestedQty}). Only ${remaining} units remaining for ${palletToLoad.itemId}.`,
+						{ variant: "error" }
+					);
+					return;
+				}
+			}
+
 			// Update pallet status
 			const updates: Record<string, unknown> = { status: newStatus };
 
@@ -264,12 +296,9 @@ export default function Screen12() {
 				status: finalOrderStatus,
 			});
 
-			// Update manifest status to Closed for both Hand Delivery and Container Loading
-			if (manifestId) {
-				await manifests.update(manifestId, {
-					status: "Closed",
-				});
-			}
+			// NOTE: Do NOT close the manifest here!
+			// Per spec, manifests remain "Open" until Customer Service finalizes them in Screen 13
+			// with signed forms and photos. Screen 12 only marks pallets as loaded.
 
 			// Show appropriate success message
 			const successMessage = hasStagedPallets

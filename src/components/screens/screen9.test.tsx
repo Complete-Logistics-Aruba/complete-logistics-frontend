@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { SnackbarProvider } from "notistack";
 import { BrowserRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -99,13 +99,18 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		renderScreen();
 
 		// Wait for loading to complete
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await waitFor(
+			() => {
+				expect(screen.getByText("ORD-001")).toBeInTheDocument();
+			},
+			{ timeout: 2000 }
+		);
 
 		expect(screen.getByText("ORD-001")).toBeInTheDocument();
 		expect(screen.getByText(/Hand Delivery/i)).toBeInTheDocument();
 	});
 
-	it("should display order count", async () => {
+	it("should display active orders count", async () => {
 		const mockOrders: ShippingOrder[] = [
 			{
 				id: "order-1",
@@ -128,9 +133,12 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		renderScreen();
 
 		// Wait for loading to complete
-		await new Promise((resolve) => setTimeout(resolve, 100));
-
-		expect(screen.getByText(/2 active orders/i)).toBeInTheDocument();
+		await waitFor(
+			() => {
+				expect(screen.getByText(/2 active orders/i)).toBeInTheDocument();
+			},
+			{ timeout: 2000 }
+		);
 	});
 
 	it("should filter for Pending, Picking, and Loading status", async () => {
@@ -169,8 +177,13 @@ describe("Screen 9: Pending Shipping Orders", () => {
 
 		renderScreen();
 
-		// Wait for loading to complete
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		// Wait for loading to complete and data to appear
+		await waitFor(
+			() => {
+				expect(screen.getByText("ORD-001")).toBeInTheDocument();
+			},
+			{ timeout: 2000 }
+		);
 
 		expect(screen.getByText("ORD-001")).toBeInTheDocument();
 		expect(screen.getByText("ORD-002")).toBeInTheDocument(); // Now visible
@@ -194,8 +207,11 @@ describe("Screen 9: Pending Shipping Orders", () => {
 		renderScreen();
 
 		// Wait for loading to complete
-		await new Promise((resolve) => setTimeout(resolve, 100));
-
-		expect(screen.getByText(/Start Picking/i)).toBeInTheDocument();
+		await waitFor(
+			() => {
+				expect(screen.getByText(/Start Picking/i)).toBeInTheDocument();
+			},
+			{ timeout: 2000 }
+		);
 	});
 });

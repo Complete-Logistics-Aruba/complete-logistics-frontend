@@ -129,10 +129,10 @@ export interface Warehouse {
  */
 export interface Manifest {
 	id: string;
-	type: "Container" | "Hand";
+	type: "Container" | "Hand_Delivery";
 	container_num?: string;
 	seal_num: string;
-	status: "Open" | "Closed";
+	status: "Open" | "Closed" | "Cancelled";
 	created_at: string;
 	closed_at?: string;
 }

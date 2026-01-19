@@ -46,6 +46,7 @@ interface ShippingOrderCard {
 	status: string;
 	itemsCount: number;
 	created_at: string;
+	hasStagedPallets?: boolean;
 }
 
 const handleRetry = () => {
@@ -76,14 +77,37 @@ export default function Screen9() {
 				const allOrders = await shippingOrders.getAll();
 
 				// Filter for Pending, Picking, or Loading status
-				const pendingOrders = allOrders.filter((order: ShippingOrder) =>
+				let pendingOrders = allOrders.filter((order: ShippingOrder) =>
 					["Pending", "Picking", "Loading"].includes(order.status)
 				);
+
+				// Also add Completed orders that have Staged pallets (cancelled manifest scenario)
+				const completedOrdersWithStaged: ShippingOrder[] = [];
+				for (const order of allOrders.filter((order: ShippingOrder) => order.status === "Completed")) {
+					const { data: stagedPallets } = await supabase
+						.from("pallets")
+						.select("id")
+						.eq("shipping_order_id", order.id)
+						.eq("status", "Staged")
+						.limit(1);
+
+					if (stagedPallets && stagedPallets.length > 0) {
+						completedOrdersWithStaged.push(order);
+					}
+				}
+
+				pendingOrders = [...pendingOrders, ...completedOrdersWithStaged];
 
 				// Build card data with item counts
 				const cardData: ShippingOrderCard[] = pendingOrders.map((order: ShippingOrder) => {
 					// Count items from order.lines if available
 					const itemsCount = order.lines ? order.lines.length : 0;
+
+					// Check if this is a Completed order with Staged pallets (cancelled manifest scenario)
+					const hasStagedPallets =
+						order.status === "Completed" &&
+						completedOrdersWithStaged.some((completedOrder) => completedOrder.id === order.id);
+
 					return {
 						id: order.id,
 						order_ref: order.order_ref,
@@ -91,6 +115,7 @@ export default function Screen9() {
 						status: order.status,
 						itemsCount,
 						created_at: order.created_at,
+						hasStagedPallets,
 					};
 				});
 
@@ -292,7 +317,8 @@ export default function Screen9() {
 							No Active Orders
 						</Typography>
 						<Typography variant="body2" color="textSecondary" sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
-							All shipping orders have been completed or there are no active orders.
+							All shipping orders have been completed or there are no active orders. Completed orders with cancelled
+							manifests will appear here for reloading.
 						</Typography>
 					</CardContent>
 				</Card>
@@ -374,7 +400,7 @@ export default function Screen9() {
 														? "warning"
 														: order.status === "Picking"
 															? "info"
-															: order.status === "Loading"
+															: order.status === "Loading" || (order.status === "Completed" && order.hasStagedPallets)
 																? "secondary"
 																: "default"
 												}
@@ -432,10 +458,12 @@ export default function Screen9() {
 												py: { xs: 1, sm: 1.25 },
 											}}
 										>
-											{order.status === "Loading" ? "Start Loading →" : "Start Picking →"}
+											{order.status === "Loading" || (order.status === "Completed" && order.hasStagedPallets)
+												? "Start Loading →"
+												: "Start Picking →"}
 										</Button>
 
-										{/* Cancel Order Button */}
+										{/* Cancel Order Button - Show for all statuses */}
 										<Button
 											fullWidth
 											variant="outlined"

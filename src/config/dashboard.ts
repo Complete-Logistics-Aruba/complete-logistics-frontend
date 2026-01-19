@@ -120,7 +120,7 @@ const createNavItems = () => {
 					},
 					{
 						key: "screen-13",
-						title: "Shipping Summary",
+						title: "Manifests",
 						href: paths.warehouseScreens.screen13,
 						icon: "file-text",
 					},

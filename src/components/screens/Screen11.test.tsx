@@ -158,7 +158,7 @@ describe("Screen11 - Load Target Selection", () => {
 		const mockHandDeliveryManifests: Manifest[] = [
 			{
 				id: "hand-manifest-001",
-				type: "Hand",
+				type: "Hand_Delivery",
 				seal_num: "SEAL-HAND-001",
 				status: "Open",
 				created_at: "2025-11-26T09:00:00Z",
