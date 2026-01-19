@@ -80,7 +80,7 @@ vi.mock("react-router-dom", async () => {
 const mockManifests: Record<string, unknown>[] = [
 	{
 		id: "manifest-001",
-		type: "Hand_Delivery",
+		type: "Hand",
 		status: "Open",
 		seal_num: "SEAL-001",
 		container_num: null,
@@ -96,7 +96,7 @@ const mockManifests: Record<string, unknown>[] = [
 	},
 	{
 		id: "manifest-003",
-		type: "Hand_Delivery",
+		type: "Hand",
 		status: "Cancelled",
 		seal_num: "SEAL-003",
 		container_num: null,

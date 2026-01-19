@@ -9,7 +9,7 @@
  * 1. Form: Manifest Type (Container/Hand Delivery), Seal # (required)
  * 2. If Container: Require Container # + Seal #
  * 3. If Hand Delivery: Require Seal # Only
- * 4. Create manifest (type=Container/Hand_Delivery, status=Open)
+ * 4. Create manifest (type=Container/Hand, status=Open)
  * 5. Display success message
  * 6. Redirect to dashboard
  * 7. Error handling
@@ -160,7 +160,7 @@ export default function Screen4() {
 						render={({ field }) => (
 							<RadioGroup {...field} row>
 								<FormControlLabel value="Container" control={<Radio />} label="Container" />
-								<FormControlLabel value="Hand_Delivery" control={<Radio />} label="Hand Delivery" />
+								<FormControlLabel value="Hand" control={<Radio />} label="Hand Delivery" />
 							</RadioGroup>
 						)}
 					/>
