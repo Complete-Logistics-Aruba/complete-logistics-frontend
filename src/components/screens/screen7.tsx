@@ -346,6 +346,24 @@ export default function Screen7() {
 			return;
 		}
 
+		// CRITICAL VALIDATION: Prevent over-receiving (same logic as Confirm Pallet)
+		// Calculate total confirmed qty for this item across all rows (including regular pallets + cross-dock)
+		const totalConfirmedForItem = rows
+			.filter((r) => r.product.item_id === row.product.item_id)
+			.reduce((sum, r) => sum + r.confirmedPallets.reduce((pSum, p) => pSum + p.qty, 0), 0);
+
+		const expectedQtyForItem = row.line.expected_qty;
+		const newTotal = totalConfirmedForItem + qty;
+
+		if (newTotal > expectedQtyForItem) {
+			const remaining = expectedQtyForItem - totalConfirmedForItem;
+			enqueueSnackbar(
+				`Cannot Ship-Now: Total qty (${newTotal}) would exceed ordered qty (${expectedQtyForItem}). Only ${remaining} units remaining.`,
+				{ variant: "error" }
+			);
+			return;
+		}
+
 		if (!row.hasShipNowOption || !row.remainingQtyByOrder || row.remainingQtyByOrder.length === 0) {
 			console.warn("⚠️ [SHIP NOW] No SHIP-NOW option available");
 			enqueueSnackbar("No shipping orders available for SHIP-NOW", { variant: "warning" });
