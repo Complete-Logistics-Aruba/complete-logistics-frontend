@@ -247,10 +247,15 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (confirming more than ordered)
-		// Calculate total confirmed qty for this item across all rows
-		const totalConfirmedForItem = rows
-			.filter((r) => r.product.item_id === row.product.item_id)
-			.reduce((sum, r) => sum + r.confirmedPallets.reduce((pSum, p) => pSum + p.qty, 0), 0);
+		// Fetch all existing pallets for this receiving order to get accurate count including SHIP-NOW
+		const allPallets = await pallets.getFiltered({
+			receiving_order_id: receivingOrderId,
+		});
+
+		// Calculate total confirmed qty for this item across all pallets (regular + cross-dock)
+		const totalConfirmedForItem = allPallets
+			.filter((p) => p.item_id === row.product.item_id)
+			.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
 		const newTotal = totalConfirmedForItem + qty;
@@ -347,10 +352,15 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (same logic as Confirm Pallet)
-		// Calculate total confirmed qty for this item across all rows (including regular pallets + cross-dock)
-		const totalConfirmedForItem = rows
-			.filter((r) => r.product.item_id === row.product.item_id)
-			.reduce((sum, r) => sum + r.confirmedPallets.reduce((pSum, p) => pSum + p.qty, 0), 0);
+		// Fetch all existing pallets for this receiving order to get accurate count including SHIP-NOW
+		const allPallets = await pallets.getFiltered({
+			receiving_order_id: receivingOrderId,
+		});
+
+		// Calculate total confirmed qty for this item across all pallets (regular + cross-dock)
+		const totalConfirmedForItem = allPallets
+			.filter((p) => p.item_id === row.product.item_id)
+			.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
 		const newTotal = totalConfirmedForItem + qty;
@@ -561,8 +571,8 @@ export default function Screen7() {
 	// Each row = 1 individual pallet
 	const totalExpected = rows.length; // Total rows = total pallets expected
 	const totalConfirmed = rows.filter((row) => row.confirmedPallets.length > 0).length; // Rows with confirmed pallets
-	// Enable finish if ANY pallets have been created (including SHIP-NOW)
-	const isFinishEnabled = totalPalletsCreated > 0;
+	// Enable finish if ANY pallets have been confirmed OR shipped via SHIP-NOW
+	const isFinishEnabled = totalConfirmed > 0 || totalPalletsCreated > 0;
 
 	return (
 		<Box sx={{ p: 3 }}>
