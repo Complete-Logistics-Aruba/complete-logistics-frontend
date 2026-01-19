@@ -8,7 +8,7 @@
  *
  * Columns:
  * - Manifest Ref (ID or seal number)
- * - Type (Hand_Delivery / Container)
+ * - Type (Hand / Container)
  * - Status (Open / Closed)
  * - Total Pallets (count of loaded pallets)
  * - Actions (View Details button)
@@ -55,7 +55,7 @@ import { sendShippingEmail } from "../../utils/shipping-email";
 interface ManifestRow {
 	id: string;
 	manifestRef: string;
-	type: "Hand_Delivery" | "Hand" | "Container";
+	type: "Hand" | "Container";
 	status: "Open" | "Closed" | "Cancelled";
 	totalPallets: number;
 	containerNum?: string;
@@ -69,9 +69,9 @@ interface LoadedItem {
 	palletCount: number;
 }
 
-// Helper function to check if manifest is Hand Delivery (handles both "Hand" and "Hand_Delivery")
+// Helper function to check if manifest is Hand Delivery
 const isHandDelivery = (type: string): boolean => {
-	return type === "Hand" || type === "Hand_Delivery";
+	return type === "Hand";
 };
 
 export default function Screen13() {
