@@ -76,6 +76,8 @@ interface PalletRow {
 	isEditing: boolean;
 	remainingQtyByOrder?: { orderId: string; remainingQty: number }[];
 	hasShipNowOption?: boolean;
+	totalRemainingQty?: number; // Total remaining qty across all shipping orders for this item
+	canShipNow?: boolean; // Whether this specific pallet can be shipped now
 }
 
 interface ShippingOrderWithLines extends ShippingOrder {
@@ -139,15 +141,12 @@ export default function Screen7() {
 					const product = await products.getByItemId(line.item_id);
 					const expectedPallets = Math.ceil(line.expected_qty / product.units_per_pallet);
 
-					// Fetch confirmed pallets for this specific item
-					const allPallets = await pallets.getFiltered({
-						receiving_order_id: receivingOrderId,
-					});
-
-					// Filter to only get pallets for THIS specific item
-					const confirmedPalletsForItem = allPallets.filter((p) => p.item_id === product.item_id);
+					// Fetch ALL pallets for this item across ALL receiving orders (for global validation)
+					const allPalletsForItem = await pallets.getAll();
+					const confirmedPalletsForItem = allPalletsForItem.filter((p) => p.item_id === product.item_id);
 					// Calculate RemainingQty for each shipping order
 					const remainingQtyByOrder: { orderId: string; remainingQty: number }[] = [];
+					let totalRemainingQty = 0;
 					for (const so of shippingOrdersWithLines) {
 						const soLine = so.lines?.find((l) => l.item_id === product.item_id);
 						if (soLine) {
@@ -158,6 +157,7 @@ export default function Screen7() {
 							const remainingQty = soLine.requested_qty - assignedQty;
 							if (remainingQty > 0) {
 								remainingQtyByOrder.push({ orderId: so.id, remainingQty });
+								totalRemainingQty += remainingQty;
 							}
 						}
 					}
@@ -171,9 +171,13 @@ export default function Screen7() {
 								? line.expected_qty - palletIndex * product.units_per_pallet
 								: product.units_per_pallet;
 
-						// Use rowIndex as the key to match handleConfirmPallet
+						// Use rowIndex as a key to match handleConfirmPallet
 						const rowIndex = rowsData.length;
 						const palletKey = `row-${rowIndex}`;
+
+						// Determine if this specific pallet can be shipped now
+						// Only enable SHIP-NOW for pallets that fit within the remaining quantity
+						const canShipNow = totalRemainingQty >= palletQty;
 
 						rowsData.push({
 							line,
@@ -185,10 +189,17 @@ export default function Screen7() {
 							isEditing: false,
 							remainingQtyByOrder,
 							hasShipNowOption,
+							totalRemainingQty,
+							canShipNow,
 						});
 
-						// Build the map instead of calling setState in loop
+						// Build map instead of calling setState in loop
 						editingQtyMap[palletKey] = palletQty;
+
+						// Update remaining quantity for next pallet if this one can be shipped
+						if (canShipNow) {
+							totalRemainingQty -= palletQty;
+						}
 					}
 				}
 
@@ -247,15 +258,12 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (confirming more than ordered)
-		// Fetch all existing pallets for this receiving order to get accurate count including SHIP-NOW
-		const allPallets = await pallets.getFiltered({
-			receiving_order_id: receivingOrderId,
-		});
+		// Fetch ALL pallets for this item across ALL receiving orders (global validation)
+		const allPallets = await pallets.getAll();
+		const allPalletsForItem = allPallets.filter((p) => p.item_id === row.product.item_id);
 
-		// Calculate total confirmed qty for this item across all pallets (regular + cross-dock)
-		const totalConfirmedForItem = allPallets
-			.filter((p) => p.item_id === row.product.item_id)
-			.reduce((sum, p) => sum + p.qty, 0);
+		// Calculate total confirmed qty for this item across all pallets (global total)
+		const totalConfirmedForItem = allPalletsForItem.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
 		const newTotal = totalConfirmedForItem + qty;
@@ -352,15 +360,12 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (same logic as Confirm Pallet)
-		// Fetch all existing pallets for this receiving order to get accurate count including SHIP-NOW
-		const allPallets = await pallets.getFiltered({
-			receiving_order_id: receivingOrderId,
-		});
+		// Fetch ALL pallets for this item across ALL receiving orders (global validation)
+		const allPallets = await pallets.getAll();
+		const allPalletsForItem = allPallets.filter((p) => p.item_id === row.product.item_id);
 
-		// Calculate total confirmed qty for this item across all pallets (regular + cross-dock)
-		const totalConfirmedForItem = allPallets
-			.filter((p) => p.item_id === row.product.item_id)
-			.reduce((sum, p) => sum + p.qty, 0);
+		// Calculate total confirmed qty for this item across all pallets (global total)
+		const totalConfirmedForItem = allPalletsForItem.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
 		const newTotal = totalConfirmedForItem + qty;
@@ -374,9 +379,14 @@ export default function Screen7() {
 			return;
 		}
 
-		if (!row.hasShipNowOption || !row.remainingQtyByOrder || row.remainingQtyByOrder.length === 0) {
-			console.warn("⚠️ [SHIP NOW] No SHIP-NOW option available");
-			enqueueSnackbar("No shipping orders available for SHIP-NOW", { variant: "warning" });
+		if (!row.hasShipNowOption || !row.canShipNow || !row.remainingQtyByOrder || row.remainingQtyByOrder.length === 0) {
+			console.warn("⚠️ [SHIP NOW] No SHIP-NOW option available or pallet cannot be shipped now");
+			enqueueSnackbar(
+				row.canShipNow === false
+					? "Shipping order quantity fulfilled - cannot ship additional pallets"
+					: "No shipping orders available for SHIP-NOW",
+				{ variant: "warning" }
+			);
 			return;
 		}
 
@@ -740,8 +750,12 @@ export default function Screen7() {
 																color="warning"
 																startIcon={<RocketIcon size={16} />}
 																onClick={() => handleShipNow(rowIndex)}
-																disabled={isSubmitting}
-																title={`Ship-Now to ${row.remainingQtyByOrder?.length || 0} order(s)`}
+																disabled={isSubmitting || !row.canShipNow}
+																title={
+																	row.canShipNow
+																		? `Ship-Now to ${row.remainingQtyByOrder?.length || 0} order(s)`
+																		: `Shipping order quantity fulfilled - cannot ship additional pallets`
+																}
 															>
 																Ship-Now
 															</Button>

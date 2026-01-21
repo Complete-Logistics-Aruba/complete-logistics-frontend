@@ -31,6 +31,7 @@ vi.mock("../../lib/api/wms-api", () => {
 		create: vi.fn(),
 		delete: vi.fn(),
 		getFiltered: vi.fn(),
+		getAll: vi.fn(),
 	};
 	const shippingOrdersMock = {
 		getAll: vi.fn(),
@@ -133,7 +134,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
 		(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([]);
 
 		renderScreen7();
@@ -160,7 +161,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue([]);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([]);
 
 		renderScreen7();
@@ -203,7 +204,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
 		(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([]);
 
 		renderScreen7();
@@ -232,7 +233,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue([]);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([]);
 
 		renderScreen7();
@@ -306,7 +307,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
 		(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([mockShippingOrder]);
 		(wmsApi.default.shippingOrders.getById as unknown as Mock).mockResolvedValue(mockShippingOrder);
 
@@ -378,7 +379,7 @@ describe("Screen 7 - Pallet Tallying", () => {
 		(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
 		(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
 		(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
-		(wmsApi.default.pallets.getFiltered as unknown as Mock).mockResolvedValue([]);
+		(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
 		(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([mockShippingOrder]);
 		(wmsApi.default.shippingOrders.getById as unknown as Mock).mockResolvedValue(mockShippingOrder);
 		(wmsApi.default.pallets.create as unknown as Mock).mockResolvedValue(mockCreatedPallet);
@@ -394,4 +395,85 @@ describe("Screen 7 - Pallet Tallying", () => {
 			expect(shipNowButtons.length).toBeGreaterThan(0);
 		});
 	});
+});
+
+test("should disable SHIP-NOW buttons when shipping order quantity is fulfilled", async () => {
+	// Mock scenario: Shipping order needs 100 units, receiving order has 250 units (5 pallets of 50 each)
+	// Only first 2 pallets (100 units) should have SHIP-NOW enabled, rest should be disabled
+
+	const mockOrder = {
+		id: "order-1",
+		container_num: "CONT-001",
+		seal_num: "SEAL-001",
+		status: "Unloading",
+		created_at: "2025-11-26T00:00:00Z",
+	};
+
+	const mockLines = [
+		{
+			id: "line-1",
+			receiving_order_id: "order-1",
+			item_id: "ITEM-123",
+			expected_qty: 250, // 5 pallets of 50 each
+		},
+	];
+
+	const mockProduct = {
+		item_id: "ITEM-123",
+		description: "Test Product",
+		units_per_pallet: 50,
+		pallet_positions: 10,
+		is_active: true,
+		created_at: "2025-11-26T00:00:00Z",
+	};
+
+	const mockShippingOrder = {
+		id: "so-1",
+		status: "Pending",
+		created_at: "2025-11-26T00:00:00Z",
+		lines: [
+			{
+				id: "sol-1",
+				shipping_order_id: "so-1",
+				item_id: "ITEM-123",
+				requested_qty: 100, // Only needs 100 units (2 pallets)
+			},
+		],
+	};
+
+	(wmsApi.default.receivingOrders.getById as unknown as Mock).mockResolvedValue(mockOrder);
+	(wmsApi.default.receivingOrderLines.getByReceivingOrderId as unknown as Mock).mockResolvedValue(mockLines);
+	(wmsApi.default.products.getByItemId as unknown as Mock).mockResolvedValue(mockProduct);
+	(wmsApi.default.pallets.getAll as unknown as Mock).mockResolvedValue([]);
+	(wmsApi.default.shippingOrders.getAll as unknown as Mock).mockResolvedValue([mockShippingOrder]);
+	(wmsApi.default.shippingOrders.getById as unknown as Mock).mockResolvedValue(mockShippingOrder);
+
+	renderScreen7();
+
+	// Wait for SHIP-NOW buttons to appear
+	await waitFor(() => {
+		const shipNowButtons = screen.queryAllByRole("button", { name: /ship-now/i });
+		expect(shipNowButtons.length).toBeGreaterThan(0);
+	});
+
+	// Get all SHIP-NOW buttons
+	const shipNowButtons = screen.queryAllByRole("button", { name: /ship-now/i });
+
+	// Should have 5 SHIP-NOW buttons (one for each pallet row)
+	expect(shipNowButtons).toHaveLength(5);
+
+	// First 2 buttons should be enabled (100 units needed)
+	expect(shipNowButtons[0]).not.toBeDisabled();
+	expect(shipNowButtons[1]).not.toBeDisabled();
+
+	// Last 3 buttons should be disabled (shipping order fulfilled)
+	expect(shipNowButtons[2]).toBeDisabled();
+	expect(shipNowButtons[3]).toBeDisabled();
+	expect(shipNowButtons[4]).toBeDisabled();
+
+	// Verify tooltip text for disabled buttons
+	expect(shipNowButtons[2]).toHaveAttribute(
+		"title",
+		"Shipping order quantity fulfilled - cannot ship additional pallets"
+	);
 });
