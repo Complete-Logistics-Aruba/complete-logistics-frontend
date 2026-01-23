@@ -141,9 +141,11 @@ export default function Screen7() {
 					const product = await products.getByItemId(line.item_id);
 					const expectedPallets = Math.ceil(line.expected_qty / product.units_per_pallet);
 
-					// Fetch ALL pallets for this item across ALL receiving orders (for global validation)
+					// Fetch pallets for this item from the CURRENT receiving order only (scoped validation)
 					const allPalletsForItem = await pallets.getAll();
-					const confirmedPalletsForItem = allPalletsForItem.filter((p) => p.item_id === product.item_id);
+					const confirmedPalletsForItem = allPalletsForItem.filter(
+						(p) => p.item_id === product.item_id && p.receiving_order_id === receivingOrderId
+					);
 					// Calculate RemainingQty for each shipping order
 					const remainingQtyByOrder: { orderId: string; remainingQty: number }[] = [];
 					let totalRemainingQty = 0;
@@ -258,11 +260,13 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (confirming more than ordered)
-		// Fetch ALL pallets for this item across ALL receiving orders (global validation)
+		// Fetch pallets for this item from the CURRENT receiving order only (scoped validation)
 		const allPallets = await pallets.getAll();
-		const allPalletsForItem = allPallets.filter((p) => p.item_id === row.product.item_id);
+		const allPalletsForItem = allPallets.filter(
+			(p) => p.item_id === row.product.item_id && p.receiving_order_id === receivingOrderId
+		);
 
-		// Calculate total confirmed qty for this item across all pallets (global total)
+		// Calculate total confirmed qty for this item in the current receiving order only
 		const totalConfirmedForItem = allPalletsForItem.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
@@ -360,11 +364,13 @@ export default function Screen7() {
 		}
 
 		// CRITICAL VALIDATION: Prevent over-receiving (same logic as Confirm Pallet)
-		// Fetch ALL pallets for this item across ALL receiving orders (global validation)
+		// Fetch pallets for this item from the CURRENT receiving order only (scoped validation)
 		const allPallets = await pallets.getAll();
-		const allPalletsForItem = allPallets.filter((p) => p.item_id === row.product.item_id);
+		const allPalletsForItem = allPallets.filter(
+			(p) => p.item_id === row.product.item_id && p.receiving_order_id === receivingOrderId
+		);
 
-		// Calculate total confirmed qty for this item across all pallets (global total)
+		// Calculate total confirmed qty for this item in the current receiving order only
 		const totalConfirmedForItem = allPalletsForItem.reduce((sum, p) => sum + p.qty, 0);
 
 		const expectedQtyForItem = row.line.expected_qty;
